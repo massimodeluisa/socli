@@ -1,0 +1,74 @@
+[package]
+name = "socli"
+version = "0.1.0"
+edition = "2021"
+description = "A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon"
+license = "MIT"
+homepage = "https://socli.sh"
+repository = "https://github.com/massimodeluisa/socli"
+readme = "README.md"
+keywords = ["social", "bluesky", "x", "cli", "tui"]
+categories = ["command-line-utilities"]
+rust-version = "1.89"
+
+[lib]
+name = "socli"
+path = "src/lib.rs"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "socli"
+path = "src/main.rs"
+
+[features]
+default = ["native"]
+# The terminal binary. The browser demo builds with `--no-default-features`.
+native = [
+    "dep:clap",
+    "dep:clap_complete",
+    "dep:crossterm",
+    "dep:signal-hook",
+    "dep:reqwest",
+    "dep:viuer",
+    "dep:ratatui-image",
+    "dep:rand",
+    "ratatui/crossterm",
+    "ratatui/underline-color",
+]
+web = []
+
+[dependencies]
+aes = "0.8"
+base64 = "0.22"
+cbc = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+cipher = { version = "0.4", features = ["std", "block-padding"] }
+clap = { version = "4", features = ["derive"], optional = true }
+clap_complete = { version = "4", optional = true }
+crossterm = { version = "0.28", optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+rand = { version = "0.8", optional = true }
+ratatui = { version = "0.29", default-features = false }
+ratatui-image = { version = "9.0.0", default-features = false, features = ["crossterm"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha1 = "0.10"
+sha2 = "0.10"
+signal-hook = { version = "0.3", optional = true }
+ssh-key = { version = "0.6.7", default-features = false, features = ["std", "ed25519", "rand_core"] }
+textwrap = "0.16"
+thiserror = "2"
+toml = "0.8"
+unicode-segmentation = "1.13"
+unicode-width = "0.2"
+url = "2"
+viuer = { version = "0.11", optional = true }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[lints.clippy]
+undocumented_unsafe_blocks = "deny"
