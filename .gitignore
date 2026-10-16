@@ -1,0 +1,10 @@
+/target
+**/*.rs.bk
+.DS_Store
+workers/*/.wrangler/
+
+# Design studies, logo dumps, and the built site. The docs source lives in website/.
+/design/
+/IMPROVEMENTS.md
+/site/
+/website/public/
