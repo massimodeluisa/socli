@@ -1,0 +1,45 @@
+//! socli — the reader, shared by the terminal binary and the browser demo.
+
+pub mod agent;
+pub mod chrome;
+#[cfg(feature = "native")]
+pub mod cli;
+pub mod clip;
+pub mod clock;
+pub mod command;
+pub mod config;
+pub mod count;
+pub mod demo;
+pub mod drafts;
+#[cfg(test)]
+pub mod fixtures;
+pub mod grid;
+pub mod help;
+pub mod hyperlink;
+pub mod intent;
+pub mod jsonview;
+pub mod key;
+#[cfg(feature = "native")]
+pub mod kitty_place;
+pub mod layout;
+pub mod media;
+pub mod minimal;
+pub mod model;
+pub mod net;
+pub mod onboard;
+pub mod palettes;
+pub mod plain;
+pub mod preview;
+pub mod render;
+pub mod rich;
+pub mod screens;
+pub mod send;
+pub mod settings;
+pub mod state;
+pub mod theme;
+pub mod tui;
+pub mod unfurl;
+pub mod util;
+#[cfg(feature = "native")]
+pub mod watchdog;
+pub mod web;
