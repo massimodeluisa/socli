@@ -1,0 +1,11 @@
+{
+ "domain": "mastodon.social",
+ "version": "4.5.0",
+ "configuration": {
+  "statuses": {
+   "max_characters": 500,
+   "max_media_attachments": 4,
+   "characters_reserved_per_url": 23
+  }
+ }
+}
