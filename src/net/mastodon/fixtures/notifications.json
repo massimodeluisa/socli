@@ -1,0 +1,258 @@
+[
+ {
+  "id": "88001",
+  "type": "mention",
+  "created_at": "2026-10-20T15:10:00.000Z",
+  "account": {
+   "id": "109001",
+   "username": "ines",
+   "acct": "ines",
+   "display_name": "Ines Duarte",
+   "locked": false,
+   "bot": false,
+   "discoverable": true,
+   "indexable": true,
+   "group": false,
+   "created_at": "2024-03-01T00:00:00.000Z",
+   "note": "<p>Terminal tools &amp; small type. Lisbon.</p>",
+   "url": "https://mastodon.social/@ines",
+   "uri": "https://mastodon.social/users/ines",
+   "avatar": "https://files.example/avatars/109001.gif",
+   "avatar_static": "https://files.example/avatars/109001.png",
+   "header": "",
+   "header_static": "",
+   "followers_count": 12,
+   "following_count": 3,
+   "statuses_count": 40,
+   "last_status_at": "2026-10-20",
+   "emojis": [],
+   "fields": []
+  },
+  "status": {
+   "id": "115000000000000011",
+   "created_at": "2026-10-20T15:10:00.000Z",
+   "in_reply_to_id": "115000000000000010",
+   "in_reply_to_account_id": "109002",
+   "sensitive": false,
+   "spoiler_text": "",
+   "visibility": "unlisted",
+   "language": "en",
+   "uri": "https://mastodon.social/users/ines/statuses/115000000000000011",
+   "url": "https://mastodon.social/@ines/115000000000000011",
+   "replies_count": 1,
+   "reblogs_count": 0,
+   "favourites_count": 0,
+   "quotes_count": 0,
+   "edited_at": null,
+   "favourited": false,
+   "reblogged": false,
+   "muted": false,
+   "bookmarked": false,
+   "content": "<p><span class=\"h-card\" translate=\"no\"><a href=\"https://fosstodon.org/@theo\" class=\"u-url mention\">@<span>theo</span></a></span> the reply in the middle.</p>",
+   "filtered": [],
+   "reblog": null,
+   "application": null,
+   "account": {
+    "id": "109001",
+    "username": "ines",
+    "acct": "ines",
+    "display_name": "Ines Duarte",
+    "locked": false,
+    "bot": false,
+    "discoverable": true,
+    "indexable": true,
+    "group": false,
+    "created_at": "2024-03-01T00:00:00.000Z",
+    "note": "<p>Terminal tools &amp; small type. Lisbon.</p>",
+    "url": "https://mastodon.social/@ines",
+    "uri": "https://mastodon.social/users/ines",
+    "avatar": "https://files.example/avatars/109001.gif",
+    "avatar_static": "https://files.example/avatars/109001.png",
+    "header": "",
+    "header_static": "",
+    "followers_count": 12,
+    "following_count": 3,
+    "statuses_count": 40,
+    "last_status_at": "2026-10-20",
+    "emojis": [],
+    "fields": []
+   },
+   "media_attachments": [],
+   "mentions": [
+    {
+     "id": "109002",
+     "username": "theo",
+     "url": "https://fosstodon.org/@theo",
+     "acct": "theo@fosstodon.org"
+    }
+   ],
+   "tags": [],
+   "emojis": [],
+   "card": null,
+   "poll": null,
+   "quote": null,
+   "quote_approval": {
+    "automatic": [
+     "public"
+    ],
+    "manual": [],
+    "current_user": "automatic"
+   }
+  }
+ },
+ {
+  "id": "88000",
+  "type": "mention",
+  "created_at": "2026-10-20T19:58:12.000Z",
+  "account": {
+   "id": "109001",
+   "username": "ines",
+   "acct": "ines",
+   "display_name": "Ines Duarte",
+   "locked": false,
+   "bot": false,
+   "discoverable": true,
+   "indexable": true,
+   "group": false,
+   "created_at": "2024-03-01T00:00:00.000Z",
+   "note": "<p>Terminal tools &amp; small type. Lisbon.</p>",
+   "url": "https://mastodon.social/@ines",
+   "uri": "https://mastodon.social/users/ines",
+   "avatar": "https://files.example/avatars/109001.gif",
+   "avatar_static": "https://files.example/avatars/109001.png",
+   "header": "",
+   "header_static": "",
+   "followers_count": 12,
+   "following_count": 3,
+   "statuses_count": 40,
+   "last_status_at": "2026-10-20",
+   "emojis": [],
+   "fields": []
+  },
+  "status": {
+   "id": "115000000000000001",
+   "created_at": "2026-10-20T19:58:12.000Z",
+   "in_reply_to_id": null,
+   "in_reply_to_account_id": null,
+   "sensitive": false,
+   "spoiler_text": "",
+   "visibility": "public",
+   "language": "en",
+   "uri": "https://mastodon.social/users/ines/statuses/115000000000000001",
+   "url": "https://mastodon.social/@ines/115000000000000001",
+   "replies_count": 3,
+   "reblogs_count": 7,
+   "favourites_count": 21,
+   "quotes_count": 1,
+   "edited_at": null,
+   "favourited": true,
+   "reblogged": false,
+   "muted": false,
+   "bookmarked": false,
+   "content": "<p>Reading the fediverse from a terminal feels right. <span class=\"h-card\" translate=\"no\"><a href=\"https://fosstodon.org/@theo\" class=\"u-url mention\">@<span>theo</span></a></span> wrote up how boosts &amp; quotes travel between servers:</p><p><a href=\"https://blog.example.org/2026/10/terminal-clients-and-the-fediverse/\" target=\"_blank\" rel=\"nofollow noopener\" translate=\"no\"><span class=\"invisible\">https://</span><span class=\"ellipsis\">blog.example.org/2026/10/termi</span><span class=\"invisible\">nal-clients-and-the-fediverse/</span></a></p><p><a href=\"https://mastodon.social/tags/mastodon\" class=\"mention hashtag\" rel=\"tag\">#<span>Mastodon</span></a> <a href=\"https://mastodon.social/tags/cli\" class=\"mention hashtag\" rel=\"tag\">#<span>CLI</span></a></p>",
+   "filtered": [],
+   "reblog": null,
+   "application": null,
+   "account": {
+    "id": "109001",
+    "username": "ines",
+    "acct": "ines",
+    "display_name": "Ines Duarte",
+    "locked": false,
+    "bot": false,
+    "discoverable": true,
+    "indexable": true,
+    "group": false,
+    "created_at": "2024-03-01T00:00:00.000Z",
+    "note": "<p>Terminal tools &amp; small type. Lisbon.</p>",
+    "url": "https://mastodon.social/@ines",
+    "uri": "https://mastodon.social/users/ines",
+    "avatar": "https://files.example/avatars/109001.gif",
+    "avatar_static": "https://files.example/avatars/109001.png",
+    "header": "",
+    "header_static": "",
+    "followers_count": 12,
+    "following_count": 3,
+    "statuses_count": 40,
+    "last_status_at": "2026-10-20",
+    "emojis": [],
+    "fields": []
+   },
+   "media_attachments": [
+    {
+     "id": "113900000000000101",
+     "type": "image",
+     "url": "https://files.example/media/original/a1.png",
+     "preview_url": "https://files.example/media/small/a1.png",
+     "remote_url": null,
+     "preview_remote_url": null,
+     "text_url": null,
+     "meta": {
+      "original": {
+       "width": 1200,
+       "height": 800,
+       "size": "1200x800",
+       "aspect": 1.5
+      },
+      "small": {
+       "width": 640,
+       "height": 427,
+       "size": "640x427",
+       "aspect": 1.5
+      }
+     },
+     "description": "A terminal window showing a thread with three replies",
+     "blurhash": "UBL_:rOpGG-oBUNG,qRj2so|=eE1w^n4S5NH"
+    }
+   ],
+   "mentions": [
+    {
+     "id": "109002",
+     "username": "theo",
+     "url": "https://fosstodon.org/@theo",
+     "acct": "theo@fosstodon.org"
+    }
+   ],
+   "tags": [
+    {
+     "name": "mastodon",
+     "url": "https://mastodon.social/tags/mastodon"
+    },
+    {
+     "name": "cli",
+     "url": "https://mastodon.social/tags/cli"
+    }
+   ],
+   "emojis": [],
+   "card": {
+    "url": "https://blog.example.org/2026/10/terminal-clients-and-the-fediverse/",
+    "title": "Terminal clients and the fediverse",
+    "description": "How a post moves between servers.",
+    "language": "en",
+    "type": "link",
+    "author_name": "",
+    "author_url": "",
+    "provider_name": "Example Blog",
+    "provider_url": "",
+    "html": "",
+    "width": 1200,
+    "height": 630,
+    "image": "https://files.example/cache/preview_cards/images/a1.webp",
+    "image_description": "",
+    "embed_url": "",
+    "blurhash": "UCF~$Qof00ay~qj[IUay?bj[t7ay",
+    "published_at": null,
+    "authors": []
+   },
+   "poll": null,
+   "quote": null,
+   "quote_approval": {
+    "automatic": [
+     "public"
+    ],
+    "manual": [],
+    "current_user": "automatic"
+   }
+  }
+ }
+]

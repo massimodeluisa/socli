@@ -1,0 +1,70 @@
+{
+ "accounts": [],
+ "statuses": [
+  {
+   "id": "115000000000000004",
+   "created_at": "2026-10-20T17:00:00.000Z",
+   "in_reply_to_id": null,
+   "in_reply_to_account_id": null,
+   "sensitive": false,
+   "spoiler_text": "",
+   "visibility": "public",
+   "language": "en",
+   "uri": "https://hachyderm.io/users/socli_news/statuses/115000000000000004",
+   "url": "https://hachyderm.io/@socli_news/115000000000000004",
+   "replies_count": 0,
+   "reblogs_count": 12,
+   "favourites_count": 30,
+   "quotes_count": 0,
+   "edited_at": null,
+   "favourited": false,
+   "reblogged": false,
+   "muted": false,
+   "bookmarked": false,
+   "content": "<p>socli now reads Mastodon.<br />Boosts, quotes and polls included.</p>",
+   "filtered": [],
+   "reblog": null,
+   "application": null,
+   "account": {
+    "id": "109004",
+    "username": "socli_news",
+    "acct": "socli_news@hachyderm.io",
+    "display_name": "socli news",
+    "locked": false,
+    "bot": false,
+    "discoverable": true,
+    "indexable": true,
+    "group": false,
+    "created_at": "2024-03-01T00:00:00.000Z",
+    "note": "",
+    "url": "https://hachyderm.io/@socli_news",
+    "uri": "https://hachyderm.io/users/socli_news",
+    "avatar": "https://files.example/avatars/109004.gif",
+    "avatar_static": "https://files.example/avatars/109004.png",
+    "header": "",
+    "header_static": "",
+    "followers_count": 12,
+    "following_count": 3,
+    "statuses_count": 40,
+    "last_status_at": "2026-10-20",
+    "emojis": [],
+    "fields": []
+   },
+   "media_attachments": [],
+   "mentions": [],
+   "tags": [],
+   "emojis": [],
+   "card": null,
+   "poll": null,
+   "quote": null,
+   "quote_approval": {
+    "automatic": [
+     "public"
+    ],
+    "manual": [],
+    "current_user": "automatic"
+   }
+  }
+ ],
+ "hashtags": []
+}
