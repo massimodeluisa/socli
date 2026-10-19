@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "id": "1004",
+      "media_type": "REPOST_FACADE",
+      "permalink": "https://www.threads.com/@ada/post/AAA4",
+      "owner": { "id": "42" },
+      "username": "ada",
+      "timestamp": "2026-02-28T10:00:00+0000",
+      "reposted_post": { "id": "777" }
+    }
+  ],
+  "paging": { "cursors": { "before": "QVFB2", "after": "QVFA2" } }
+}

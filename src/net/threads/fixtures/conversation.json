@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "id": "2001",
+      "media_type": "TEXT_POST",
+      "permalink": "https://www.threads.com/@bob/post/BBB1",
+      "username": "bob",
+      "text": "reply to the root",
+      "timestamp": "2026-03-01T18:30:00+0000",
+      "root_post": { "id": "1001" },
+      "replied_to": { "id": "1001" },
+      "is_reply": true
+    },
+    {
+      "id": "2002",
+      "media_type": "TEXT_POST",
+      "permalink": "https://www.threads.com/@ada/post/BBB2",
+      "username": "ada",
+      "text": "reply to bob",
+      "timestamp": "2026-03-01T18:40:00+0000",
+      "root_post": { "id": "1001" },
+      "replied_to": { "id": "2001" },
+      "is_reply": true
+    }
+  ],
+  "paging": { "cursors": { "before": "Q1", "after": "Q2" } }
+}

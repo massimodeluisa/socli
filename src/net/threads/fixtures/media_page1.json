@@ -1,0 +1,48 @@
+{
+  "data": [
+    {
+      "id": "1001",
+      "media_product_type": "THREADS",
+      "media_type": "TEXT_POST",
+      "permalink": "https://www.threads.com/@ada/post/AAA1",
+      "owner": { "id": "42" },
+      "username": "ada",
+      "text": "first thread, quoting another",
+      "timestamp": "2026-03-01T18:20:00+0000",
+      "is_quote_post": true,
+      "quoted_post": { "id": "900" },
+      "root_post": { "id": "1001" },
+      "has_replies": true
+    },
+    {
+      "id": "1002",
+      "media_type": "CAROUSEL_ALBUM",
+      "permalink": "https://www.threads.com/@ada/post/AAA2",
+      "owner": { "id": "42" },
+      "username": "ada",
+      "text": "two pictures",
+      "timestamp": "2026-03-01T17:00:00+0000",
+      "link_attachment_url": "https://www.example.com/read/more/",
+      "children": {
+        "data": [
+          { "id": "c1", "media_type": "IMAGE", "media_url": "https://cdn.example.com/1.jpg" },
+          { "id": "c2", "media_type": "VIDEO", "media_url": "https://cdn.example.com/2.mp4", "thumbnail_url": "https://cdn.example.com/2.jpg" }
+        ]
+      }
+    },
+    {
+      "id": "1003",
+      "media_type": "IMAGE",
+      "permalink": "https://www.threads.com/@ada/post/AAA3",
+      "owner": { "id": "42" },
+      "username": "ada",
+      "timestamp": "2026-03-01T16:00:00+0000",
+      "media_url": "https://cdn.example.com/3.jpg",
+      "alt_text": "a cat on a keyboard"
+    }
+  ],
+  "paging": {
+    "cursors": { "before": "QVFB", "after": "QVFA" },
+    "next": "https://graph.threads.com/v1.0/42/threads?after=QVFA"
+  }
+}
