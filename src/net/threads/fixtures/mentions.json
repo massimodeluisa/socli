@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "id": "3001",
+      "media_type": "TEXT_POST",
+      "permalink": "https://www.threads.com/@cy/post/CCC1",
+      "username": "cy",
+      "text": "hello @ada",
+      "timestamp": "2026-03-02T09:15:30+0000",
+      "root_post": { "id": "3001" }
+    }
+  ],
+  "paging": { "cursors": { "before": "M1", "after": "M2" } }
+}
