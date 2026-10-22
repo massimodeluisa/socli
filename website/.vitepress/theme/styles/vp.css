@@ -1,0 +1,200 @@
+/* Styles for the markdown that VitePress renders inside the site shell. */
+
+/* Heading anchors */
+
+.doc h1,
+.doc h2,
+.doc h3,
+.doc h4,
+.doc h5,
+.doc h6,
+.book h1,
+.book h2,
+.book h3 {
+  position: relative;
+}
+
+.doc .header-anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin-left: -0.87em;
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.doc .header-anchor::before { content: "#"; }
+
+.doc h1:hover .header-anchor,
+.doc h2:hover .header-anchor,
+.doc h3:hover .header-anchor,
+.doc h4:hover .header-anchor,
+.doc h5:hover .header-anchor,
+.doc h6:hover .header-anchor,
+.doc .header-anchor:focus {
+  opacity: 1;
+}
+
+.features .header-anchor,
+.keys .header-anchor,
+.prose .header-anchor {
+  display: none;
+}
+
+/* Code blocks */
+
+div[class*="language-"] {
+  position: relative;
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--snippet);
+}
+
+div[class*="language-"] > pre {
+  margin: 0;
+  padding: 16px 48px 16px 16px;
+  overflow-x: auto;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  line-height: 21px;
+  white-space: pre;
+}
+
+div[class*="language-"] > pre > code {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+div[class*="language-"] > span.lang { display: none; }
+
+/* Copy button on code blocks */
+
+div[class*="language-"] > button.copy {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 21px;
+  cursor: pointer;
+}
+
+div[class*="language-"] > button.copy::before { content: "copy"; }
+
+div[class*="language-"] > button.copy:hover { color: var(--fg); }
+
+div[class*="language-"] > button.copy.copied::before { content: "copied"; }
+
+/* Tables */
+
+main table {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+main th,
+main td {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+main th { color: var(--fg); font-weight: 700; }
+
+/* The key list on the home page */
+
+.keys table {
+  width: 100%;
+  margin: 8px 0 0;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.keys th,
+.keys td {
+  padding: 5px 16px 5px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.keys th {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.keys td:first-child {
+  width: 16em;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.keys tr:last-child td { border-bottom: 0; }
+
+/* Prose blocks */
+
+.prose strong,
+.features strong,
+.keys strong {
+  color: var(--fg);
+  font-weight: 700;
+}
+
+.prose ul,
+.prose ol,
+.features ul,
+.features ol {
+  margin: 21px 0 0;
+  padding-left: 22px;
+}
+
+.prose li,
+.features li {
+  margin: 6px 0;
+}
+
+/* Lists and quotes in the docs */
+
+.doc ul,
+.doc ol {
+  margin: 16px 0;
+  padding-left: 22px;
+}
+
+.doc li { margin: 6px 0; }
+
+.doc blockquote {
+  margin: 16px 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.doc hr {
+  height: 1px;
+  margin: 32px 0;
+  border: 0;
+  background: var(--line);
+}
+
+.doc img {
+  max-width: 100%;
+  height: auto;
+}
