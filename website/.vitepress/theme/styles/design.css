@@ -1,0 +1,157 @@
+@font-face {
+  font-family: Geist;
+  src: url("/fonts/Geist-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Geist;
+  src: url("/fonts/Geist-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.book {
+  font-family: Geist, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.book h1,
+.book h2 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.book h1 {
+  font-size: 40px;
+  line-height: 44px;
+  margin: 8px 0 16px;
+}
+
+.book h2 {
+  font-size: 22px;
+  line-height: 28px;
+  margin: 48px 0 12px;
+}
+
+.book main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 24px 96px;
+}
+
+.book p { margin: 0 0 14px; }
+
+.book a { text-decoration-thickness: 1px; text-underline-offset: 3px; }
+
+.book .lede { max-width: 62ch; }
+
+.book .hero {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin: 28px 0 8px;
+}
+
+.book .hero-plate {
+  background: #fff;
+  padding: 12px;
+  flex: none;
+}
+
+.book .hero-plate img { display: block; width: 220px; height: 220px; }
+
+.book code,
+.book .token {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 0.92em;
+}
+
+.book .swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px 20px;
+  margin: 8px 0 4px;
+}
+
+.book .swatch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.book .chip {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--line);
+}
+
+.book .swatch span { display: flex; flex-direction: column; gap: 2px; }
+.book .swatch small { color: var(--muted); }
+
+.book .matrix {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 16px;
+  margin-top: 8px;
+}
+
+.book .cell figcaption,
+.book .sizes figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.book .plate {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 152px;
+}
+
+.book .plate img { width: 128px; height: 128px; display: block; }
+
+.book .plate.white { background: #fff; }
+.book .plate.dark { background: #000; }
+
+.book .plate.clear {
+  background-color: #eee;
+  background-image:
+    linear-gradient(45deg, #d5d5d5 25%, transparent 25%),
+    linear-gradient(-45deg, #d5d5d5 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d5d5d5 75%),
+    linear-gradient(-45deg, transparent 75%, #d5d5d5 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.book .sizes {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
+  background: #fff;
+  padding: 12px 16px;
+  margin-top: 8px;
+}
+
+.book .sizes figcaption { flex-basis: 100%; margin-top: 0; }
+
+.book .sizes img { display: block; height: auto; }
+
+.book figure { margin: 0; }
+
+@media (max-width: 720px) {
+  .book .hero { flex-direction: column; align-items: flex-start; }
+  .book .hero-plate img { width: 160px; height: 160px; }
+  .book .matrix { grid-template-columns: 1fr 1fr; }
+  .book h1 { font-size: 32px; line-height: 36px; }
+}

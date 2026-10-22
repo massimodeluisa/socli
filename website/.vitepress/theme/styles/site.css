@@ -1,0 +1,845 @@
+@import "../../../../packages/web/renderer.css";
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* nf-md glyphs the reader draws. Geist Mono has no private-use icons. */
+@font-face {
+  font-family: "Symbols Nerd Font Mono";
+  src: url("/fonts/SymbolsNerdFontMono-Regular.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+F0065, U+F009C, U+F00C0, U+F00C3, U+F0128, U+F012C, U+F0156, U+F0182, U+F01D8,
+    U+F02D1, U+F02D5, U+F0339, U+F0456, U+F0791, U+F0976, U+F0A9E-F0AA5;
+}
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000;
+  --fg: #ededed;
+  --muted: #a1a1a1;
+  --line: #262626;
+  --term: #e7e9ea;
+  --dim: #8b98a5;
+  --surface: #16181c;
+  --code: #161616;
+  --snippet: #0a0a0a;
+  --dot: #3a3b3d;
+  --blue: #1d9bf0;
+  --pink: #f91880;
+  --green: #00ba7c;
+  --amber: #d08a3c;
+  --rose: #e5689a;
+  --coral: #ee6e4e;
+  --sage: #7db86b;
+  --violet: #a57fe0;
+  --teal: #3cb8a6;
+  --gold: #d6b34a;
+  --sky: #6aa8e8;
+  --indigo: #8480ff;
+  --rule: #2f3336;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fff;
+  --fg: #0f1419;
+  --muted: #536471;
+  --line: #d9e1e5;
+  --term: #0f1419;
+  --dim: #536471;
+  --surface: #f2f5f6;
+  --code: #eef3f4;
+  --snippet: #f7f9fa;
+  --dot: #cfd8dc;
+  --blue: #1a8cd8;
+  --pink: #e0176f;
+  --green: #00a36e;
+  --amber: #b36a1c;
+  --rose: #cc4a7f;
+  --coral: #d24c2b;
+  --sage: #4c9a3a;
+  --violet: #7e52c7;
+  --teal: #13917f;
+  --gold: #a8841a;
+  --sky: #3a82cc;
+  --indigo: #563acc;
+  --rule: #d9e1e5;
+}
+
+@media (prefers-color-scheme: light) {
+  [data-theme="auto"] {
+    color-scheme: light;
+    --bg: #fff;
+    --fg: #0f1419;
+    --muted: #536471;
+    --line: #d9e1e5;
+    --term: #0f1419;
+    --dim: #536471;
+    --surface: #f2f5f6;
+    --code: #eef3f4;
+    --snippet: #f7f9fa;
+    --dot: #cfd8dc;
+    --blue: #1a8cd8;
+    --pink: #e0176f;
+    --green: #00a36e;
+    --amber: #b36a1c;
+    --rose: #cc4a7f;
+    --coral: #d24c2b;
+    --sage: #4c9a3a;
+    --violet: #7e52c7;
+    --teal: #13917f;
+    --gold: #a8841a;
+    --sky: #3a82cc;
+    --indigo: #563acc;
+    --rule: #d9e1e5;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--bg); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 14px;
+  line-height: 21px;
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 1px solid var(--fg);
+  outline-offset: 3px;
+}
+
+.skip {
+  position: absolute;
+  left: 16px;
+  top: 8px;
+  padding: 4px 8px;
+  background: var(--bg);
+  color: var(--fg);
+  transform: translateY(-150%);
+}
+
+.skip:focus { transform: none; }
+
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+header, footer {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 3vw, 24px);
+  padding: 0 32px;
+}
+
+header { min-height: 64px; }
+
+@media (min-width: 801px) {
+  .site { padding-top: var(--header-h, 64px); }
+
+  header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 41;
+    background: var(--bg);
+    transform: translate3d(0, 0, 0);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .chrome-away header {
+    transform: translate3d(0, calc(-100% - 1px), 0);
+  }
+}
+
+@media (min-width: 801px) and (prefers-reduced-motion: reduce) {
+  header { transition: none; }
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.mark { display: block; flex: none; border-radius: 5px; }
+img.mark { border: 1px solid var(--line); }
+
+header nav { display: flex; gap: clamp(10px, 3vw, 24px); }
+
+header nav a, footer a {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+header nav a:hover, footer a:hover { color: var(--fg); }
+
+.themes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.themes button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.themes button[aria-checked="true"] { color: var(--fg); }
+
+main { padding: 8px 32px 0; }
+
+h1 {
+  margin: 0;
+  max-width: 16em;
+  color: var(--fg);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 28px;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 28px 40px;
+  align-items: center;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.stage h1 { max-width: none; }
+
+.so-mark {
+  display: flex;
+  align-items: baseline;
+  margin: 0 0 16px;
+  min-height: 1em;
+  color: var(--fg);
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 40px;
+  font-weight: 700;
+  font-synthesis: none;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.so-run,
+.so-keep,
+.so-tail-text {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.so-tail {
+  flex: none;
+  min-width: 0;
+  max-width: 12em;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 0.55s cubic-bezier(0.45, 0, 0.2, 1);
+}
+
+.so-tail.is-gone { max-width: 0; }
+
+.so-cursor {
+  flex: none;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.so-cursor.is-blink {
+  animation: so-blink 1.06s steps(1, end) infinite;
+}
+
+@keyframes so-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (max-width: 720px) {
+  .so-mark { font-size: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .so-tail { transition: none; }
+  .so-cursor.is-blink { animation: none; }
+}
+
+.stage-demo .term { margin-top: 0; }
+
+.stage .install button { white-space: normal; }
+
+.nets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.nets a { text-decoration: none; }
+
+.nets a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+.install { margin: 14px 0 0; overflow-x: auto; }
+
+.install button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  line-height: 21px;
+  white-space: nowrap;
+  cursor: pointer;
+  text-align: left;
+}
+
+.install button:hover .cmd { text-decoration: underline; text-underline-offset: 2px; }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 21px;
+}
+
+.meta a { color: var(--muted); }
+
+.meta code, .prose code, .features code, .keys code {
+  font: inherit;
+  color: var(--fg);
+}
+
+.term {
+  margin-top: 28px;
+  width: min(100%, calc(92ch + 12px));
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  font-family: "Geist Mono", "Symbols Nerd Font Mono", ui-monospace, monospace;
+  font-size: 13px;
+  /* Geist Mono box drawing is 1.31em tall. 19px left a gap between rows.
+     fit() reads this computed line-height, so the painted rows use the same length. */
+  --cell: 17px;
+  line-height: var(--cell);
+}
+
+.term.is-live { border-color: var(--dim); }
+
+.term-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 36px;
+  padding: 0 10px 0 14px;
+  color: var(--muted);
+}
+
+.dots { display: flex; gap: 6px; }
+
+.dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot);
+  display: block;
+}
+
+.term-title { color: var(--muted); }
+
+.term-tools {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.term-sizes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.size-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.size-btn:hover,
+.size-btn[aria-pressed="true"] { color: var(--fg); }
+
+.size-btn[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--line); }
+
+.size-btn i {
+  display: block;
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+.size-btn[data-size="mobile"] i { width: 8px; height: 14px; border-radius: 2px; }
+
+.size-btn[data-size="tablet"] i { width: 12px; height: 15px; }
+
+.size-btn[data-size="desktop"] i {
+  width: 16px;
+  height: 11px;
+  position: relative;
+}
+
+.size-btn[data-size="desktop"] i::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: -4px;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+.term-full {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 24px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.term-full:hover { color: var(--fg); }
+
+.site.reader .term-full { display: none; }
+
+.term-hint, .term-layout { margin-right: 6px; }
+
+.term.is-live .term-hint { display: none; }
+
+.icon-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: transparent;
+  font: inherit;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+
+.icon-btn::before {
+  content: "(i)";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 24px;
+}
+
+#expand::before { content: "⤢"; font-size: 14px; }
+
+.term.is-open #expand::before { content: "⤡"; }
+
+.icon-btn:hover::before { color: var(--fg); }
+
+.about {
+  margin: 0;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 520px;
+  padding: 4px 4px 8px;
+  color: var(--term);
+  outline: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.term.is-open .screen { height: 680px; }
+
+.screen:focus-visible { outline: none; }
+
+.wasm-grid { display: none; }
+
+.term.is-wasm .wasm-grid {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  font-variant-ligatures: none;
+}
+
+/* A vertical pan is one post swipe. The page still scrolls when the gesture starts outside the card. */
+.term.is-wasm .screen { touch-action: pan-x; }
+
+.term.is-wasm .chrome,
+.term.is-wasm .feed { display: none; }
+
+/* A percentage is cyclic with the stage's max-content column, so this stays a length. */
+.term.can-split { width: calc(124ch + 12px); }
+
+/* The size class is the fake window. It wins over the responsive card and over .can-split. */
+.term.is-mobile { width: 390px; max-width: none; }
+.term.is-mobile .screen { height: 700px; }
+
+.term.is-tablet { width: 768px; max-width: none; }
+.term.is-tablet .screen { height: 900px; }
+
+.term.is-desktop { width: 1280px; max-width: none; }
+.term.is-desktop .screen { height: 800px; }
+
+.chrome, .feed { min-width: 92ch; }
+
+.feed {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: var(--line) transparent;
+}
+
+.row {
+  white-space: pre;
+  min-width: 92ch;
+  min-height: var(--cell);
+}
+
+.row.is-sel { background: var(--surface); }
+
+.rule {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--rule);
+}
+
+.card-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 92ch;
+}
+
+.card-row.is-sel { background: var(--surface); }
+
+.card-row .indent {
+  flex: none;
+  white-space: pre;
+}
+
+.card {
+  width: 56ch;
+  margin: 1px 0;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+.card-h, .card-alt {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1px 8px 0;
+  color: var(--dim);
+  min-width: 0;
+}
+
+.card-alt span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.card-alt { padding-bottom: 3px; }
+
+.card svg {
+  display: block;
+  width: calc(100% - 16px);
+  height: 72px;
+  margin: 4px 8px 2px;
+  background: var(--surface);
+}
+
+.b { font-weight: 700; }
+.dim { color: var(--dim); }
+.blue { color: var(--blue); }
+.pink { color: var(--pink); }
+.green { color: var(--green); }
+.amber { color: var(--amber); }
+.rose { color: var(--rose); }
+.coral { color: var(--coral); }
+.sage { color: var(--sage); }
+.violet { color: var(--violet); }
+.indigo { color: var(--indigo); }
+.teal { color: var(--teal); }
+.gold { color: var(--gold); }
+.sky { color: var(--sky); }
+.rulec { color: var(--rule); }
+
+.touch {
+  display: none;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.touch button {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.touch button:hover { color: var(--fg); }
+
+.prose {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 21px 48px;
+  width: 100%;
+  margin-top: 48px;
+  color: var(--muted);
+}
+
+.prose p { margin: 0; }
+
+.prose a {
+  color: var(--fg);
+  text-underline-offset: 2px;
+}
+
+.features, .keys {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 36px 48px;
+  width: 100%;
+  margin-top: 64px;
+}
+
+.features h2, .keys h2, .keys h3 {
+  margin: 0 0 4px;
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 21px;
+}
+
+.features h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.features h2 a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+.features p, .keys > p { margin: 0; }
+
+.keys { width: 100%; margin-top: 64px; }
+
+.keys h2 { margin-bottom: 4px; }
+
+.keys .key-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 36px 48px;
+  align-items: start;
+  margin-top: 28px;
+}
+
+.keys .key-group h3 { margin-top: 0; }
+
+footer {
+  margin-top: 16px;
+  padding-top: 32px;
+  padding-bottom: 40px;
+}
+
+/* A percentage width is cyclic in the stage's max-content column and can shrink the card below the water. */
+@media (min-width: 1201px) {
+  /* The reader keeps its width. The title column takes the rest, out to the page padding. */
+  .stage {
+    max-width: none;
+  }
+
+  .stage-demo .term:not(.is-mobile):not(.is-tablet):not(.is-desktop) {
+    width: calc(92ch + 12px);
+  }
+}
+
+@media (max-width: 1200px) {
+  .stage { display: block; max-width: none; }
+  .stage-demo { margin-top: 28px; }
+}
+
+.stage.room { max-width: none; }
+
+.stage:has(.term.is-mobile),
+.stage:has(.term.is-tablet),
+.stage:has(.term.is-desktop) { max-width: none; }
+
+@media (max-width: 1200px) {
+  .stage.room { max-width: calc(124ch + 12px); }
+}
+
+@media (min-width: 1500px) {
+  .prose,
+  .features,
+  .keys .key-groups {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .prose, .features, .keys .key-groups { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  header, footer, main { padding-left: 20px; padding-right: 20px; }
+  header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .term-hint, .term-layout { display: none; }
+  .install button { white-space: normal; }
+}
+
+@media (pointer: coarse) {
+  .touch { display: flex; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+/* /web and web.socli.sh are the reader alone. A size class puts the bordered card back. */
+.site.reader {
+  min-height: 100vh;
+  padding-top: 0;
+}
+
+.site.reader main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.reader-only,
+.reader-only > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Height is on the card itself. A flex parent in the markdown wrapper does not get a definite height. */
+.site.reader .term:not(.is-mobile):not(.is-tablet):not(.is-desktop) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.site.reader .term:not(.is-mobile):not(.is-tablet):not(.is-desktop) .term-bar {
+  display: none;
+}
+
+.site.reader .term:not(.is-mobile):not(.is-tablet):not(.is-desktop) .screen {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+}
+
+.site.reader .term.is-mobile,
+.site.reader .term.is-tablet,
+.site.reader .term.is-desktop {
+  flex: 0 0 auto;
+  margin: auto;
+}
