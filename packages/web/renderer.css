@@ -1,0 +1,239 @@
+.wasm-row {
+  height: var(--cell);
+  line-height: var(--cell);
+  white-space: pre;
+}
+
+.wasm-row span {
+  display: inline-block;
+  height: var(--cell);
+  line-height: var(--cell);
+  vertical-align: top;
+}
+
+/*
+ * font-size's ch is the parent's column. The glyph is one em of that size, so width is 1em.
+ * 1ch on this span is the fallback monospace: the subset has no 0, and that width is too narrow.
+ */
+.wasm-row span.is-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1em;
+  min-width: 1em;
+  font-family: "Symbols Nerd Font Mono", monospace;
+  font-size: 1ch;
+  font-synthesis: none;
+  line-height: 1;
+}
+
+.wasm-grid .is-cursor {
+  outline: 1px solid currentColor;
+  outline-offset: -1px;
+}
+
+/* The font glyph sits inside the advance and leaves a hairline. These rectangles fill the cell. */
+.wasm-block { position: relative; }
+
+.wasm-block i {
+  position: absolute;
+  display: block;
+  background: currentColor;
+}
+
+.wasm-block.full i { inset: 0; }
+
+.wasm-block.upper i {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(50% + 0.5px);
+}
+
+.wasm-block.lower i {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(50% + 0.5px);
+}
+
+.wasm-block.left i {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(50% + 0.5px);
+}
+
+.wasm-block.right i {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: calc(50% + 0.5px);
+}
+
+/* ▍ and ▎ stack as rails. The glyph leaves the last pixel of the row, so the join reads as a crack. */
+.wasm-block.three i,
+.wasm-block.quarter i {
+  top: -1px;
+  bottom: -1px;
+  left: 0;
+}
+
+.wasm-block.three i { width: 37.5%; }
+.wasm-block.quarter i { width: 25%; }
+
+/* The glyph ends inside the line box. Arms share one 2px centerline and run 1px into the next cell. */
+.wasm-draw { position: relative; --sw: 2px; --half: 1px; }
+
+.wasm-draw i,
+.wasm-draw b,
+.wasm-draw .curve {
+  position: absolute;
+  display: block;
+}
+
+.wasm-draw i,
+.wasm-draw b { background: currentColor; }
+
+.wasm-draw.v i,
+.wasm-draw.vr i,
+.wasm-draw.vl i,
+.wasm-draw.cr i,
+.wasm-draw.tl i,
+.wasm-draw.tr i,
+.wasm-draw.bl i,
+.wasm-draw.br i,
+.wasm-draw.stl i,
+.wasm-draw.str i,
+.wasm-draw.sbl i,
+.wasm-draw.sbr i,
+.wasm-draw.hd b,
+.wasm-draw.hu b,
+.wasm-draw.vdash i,
+.wasm-draw.vdash b {
+  left: calc(50% - var(--half));
+  width: var(--sw);
+}
+
+.wasm-draw.v i,
+.wasm-draw.vr i,
+.wasm-draw.vl i,
+.wasm-draw.cr i {
+  top: calc(var(--half) * -1);
+  bottom: calc(var(--half) * -1);
+}
+
+.wasm-draw.h i,
+.wasm-draw.hd i,
+.wasm-draw.hu i,
+.wasm-draw.cr b,
+.wasm-draw.tl b,
+.wasm-draw.tr b,
+.wasm-draw.bl b,
+.wasm-draw.br b,
+.wasm-draw.stl b,
+.wasm-draw.str b,
+.wasm-draw.sbl b,
+.wasm-draw.sbr b,
+.wasm-draw.vr b,
+.wasm-draw.vl b,
+.wasm-draw.hdash i,
+.wasm-draw.hdash b {
+  top: calc(50% - var(--half));
+  height: var(--sw);
+}
+
+.wasm-draw.h i,
+.wasm-draw.hd i,
+.wasm-draw.hu i,
+.wasm-draw.cr b {
+  left: calc(var(--half) * -1);
+  right: calc(var(--half) * -1);
+}
+
+.wasm-draw.vr b,
+.wasm-draw.stl b,
+.wasm-draw.sbl b { left: calc(50% - var(--half)); right: calc(var(--half) * -1); }
+
+.wasm-draw.vl b,
+.wasm-draw.str b,
+.wasm-draw.sbr b { left: calc(var(--half) * -1); right: calc(50% - var(--half)); }
+
+.wasm-draw.hd b { top: calc(50% - var(--half)); bottom: calc(var(--half) * -1); }
+.wasm-draw.hu b { top: calc(var(--half) * -1); bottom: calc(50% - var(--half)); }
+
+.wasm-draw.stl i,
+.wasm-draw.str i { top: calc(50% - var(--half)); bottom: calc(var(--half) * -1); }
+
+.wasm-draw.sbl i,
+.wasm-draw.sbr i { top: calc(var(--half) * -1); bottom: calc(50% - var(--half)); }
+
+/* The curve hands off to the straight arm one pixel before the tangent, on the same edge as │. */
+.wasm-draw.tl i,
+.wasm-draw.tr i { top: calc(50% + 2px); bottom: calc(var(--half) * -1); }
+
+.wasm-draw.bl i,
+.wasm-draw.br i { top: calc(var(--half) * -1); bottom: calc(50% + 2px); }
+
+.wasm-draw.tl b,
+.wasm-draw.bl b { left: calc(50% + 2px); right: calc(var(--half) * -1); }
+
+.wasm-draw.tr b,
+.wasm-draw.br b { left: calc(var(--half) * -1); right: calc(50% + 2px); }
+
+.wasm-draw .curve { width: 4px; height: 4px; background: none; }
+
+.wasm-draw.tl .curve {
+  left: calc(50% - var(--half));
+  top: calc(50% - var(--half));
+  background: radial-gradient(circle at 100% 100%, transparent 2px, currentColor 2px, currentColor 4px, transparent 4px);
+}
+
+.wasm-draw.tr .curve {
+  right: calc(50% - var(--half));
+  top: calc(50% - var(--half));
+  background: radial-gradient(circle at 0% 100%, transparent 2px, currentColor 2px, currentColor 4px, transparent 4px);
+}
+
+.wasm-draw.bl .curve {
+  left: calc(50% - var(--half));
+  bottom: calc(50% - var(--half));
+  background: radial-gradient(circle at 100% 0%, transparent 2px, currentColor 2px, currentColor 4px, transparent 4px);
+}
+
+.wasm-draw.br .curve {
+  right: calc(50% - var(--half));
+  bottom: calc(50% - var(--half));
+  background: radial-gradient(circle at 0% 0%, transparent 2px, currentColor 2px, currentColor 4px, transparent 4px);
+}
+
+.wasm-draw.vdash i { top: 8%; height: 30%; }
+.wasm-draw.vdash b { top: 58%; height: 30%; }
+
+.wasm-draw.hdash i { left: 8%; width: 30%; }
+.wasm-draw.hdash b { left: 58%; width: 30%; }
+
+.term.is-wasm .wasm-grid { position: relative; }
+
+.wasm-pics {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wasm-pics img {
+  position: absolute;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+}
+
+.wasm-pics img.is-avatar,
+.wasm-pics img.is-square { object-fit: cover; }
+
+.wasm-pics img.is-avatar { border-radius: 50%; }
+
+.wasm-pics img.is-square { border-radius: 20%; }
+
