@@ -1,0 +1,32 @@
+name = "socli-threads-token"
+main = "index.js"
+compatibility_date = "2026-10-23"
+workers_dev = false
+account_id = "0bd58d452e1c9c21982edbf02b8fbdc8"
+
+# Deploy is manual. Do not put the secret in this file.
+# wrangler secret put THREADS_APP_SECRET
+# wrangler secret put THREADS_APP_ID
+# THREADS_APP_ID is the Threads app id, not the Facebook app id.
+# Put a rate-limit rule on the route in Cloudflare. This script does not keep one.
+
+# Path routes only. Do not attach socli.sh as a custom domain.
+# The apex needs a proxied DNS record. Other paths are not this Worker.
+[[routes]]
+pattern = "socli.sh/threads/token"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/threads/deletion"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/threads/delete"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/threads/deauthorize"
+zone_name = "socli.sh"
+
+[vars]
+THREADS_APP_ID = "2168336333756240"
