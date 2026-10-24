@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - run: cargo clippy --all-targets -- -D warnings
+
+  tests:
+    name: tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    strategy:
+      # Windows is allowed to fail and must not cancel the other runners.
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - run: cargo test --locked
+
+  wasm:
+    name: wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - name: Check the wasm graph
+        run: |
+          bad=$(cargo tree --locked --target wasm32-unknown-unknown --no-default-features --prefix none | grep -E '^(crossterm|signal-hook|reqwest|viuer|ratatui-image) ' || true)
+          if [ -n "$bad" ]; then
+            echo "$bad" >&2
+            echo "a native crate entered the wasm graph" >&2
+            exit 1
+          fi
+      # Warning ratchet: the historical wasm rustc warning count is 71.
+      # Do not fail on that count. The parent measures the wasm cargo check
+      # output and writes the ceiling here. Until that number is set, this
+      # job does not enforce a warning ceiling. Deny-level lints, including
+      # clippy::undocumented_unsafe_blocks, still fail the build.
+      - name: Check wasm
+        run: cargo check --locked --lib --no-default-features --target wasm32-unknown-unknown
+      - name: Clippy wasm
+        run: cargo clippy --locked --lib --no-default-features --target wasm32-unknown-unknown
+
+  msrv:
+    name: msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "1.89"
+      # rust-toolchain.toml pins 1.99.1. The +1.89 override selects the MSRV.
+      - name: Check Rust 1.89
+        run: cargo +1.89 check --locked
+
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-deny@0.20.2
+          fallback: none
+      - run: cargo deny check
