@@ -1,0 +1,59 @@
+name = "socli-site"
+main = "index.js"
+compatibility_date = "2026-10-24"
+workers_dev = false
+account_id = "0bd58d452e1c9c21982edbf02b8fbdc8"
+
+# The built reader. run_worker_first keeps /?code&state=x.<64> on the loopback
+# bounce instead of the homepage file. html_handling none: this Worker fetches
+# web/index.html itself, so the platform does not redirect an OAuth query away.
+# Do not set not_found_handling. A missing file must stay a 404.
+# Do not set custom_domain.
+
+[assets]
+directory = "../../website/.vitepress/dist"
+binding = "ASSETS"
+run_worker_first = true
+html_handling = "none"
+
+# Routes only. Do not set custom_domain. That would attach socli.sh to this Worker
+# and take the hostname off the token exchange.
+# socli.sh/ does not match a query string. The wildcard does, so an OAuth return
+# on / reaches this Worker. Longer /threads/* routes stay on socli-threads-token.
+# A healthy origin response is passed through. These pages show when the origin is down.
+
+[[routes]]
+pattern = "socli.sh/*"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/index.html"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/privacy"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/privacy.html"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/terms"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/terms.html"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/data-deletion"
+zone_name = "socli.sh"
+
+[[routes]]
+pattern = "socli.sh/data-deletion.html"
+zone_name = "socli.sh"
