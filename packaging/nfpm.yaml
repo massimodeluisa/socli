@@ -1,0 +1,20 @@
+name: socli
+arch: ${PACKAGE_ARCH}
+platform: linux
+version: ${VERSION}
+release: 1
+section: utils
+priority: optional
+maintainer: ${PACKAGE_MAINTAINER}
+description: A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon
+homepage: https://socli.sh
+license: MIT
+contents:
+  - src: release/package/socli
+    dst: /usr/bin/socli
+    file_info:
+      mode: 0755
+  - src: LICENSE
+    dst: /usr/share/licenses/socli/LICENSE
+  - src: THIRD-PARTY-NOTICES.md
+    dst: /usr/share/doc/socli/THIRD-PARTY-NOTICES.md
