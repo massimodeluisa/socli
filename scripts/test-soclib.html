@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>soclib browser checks</title>
+<style>
+  body { max-width: 1400px; margin: 24px auto; padding: 0 16px; font: 16px/1.5 system-ui; background: #fff; color: #0f1419; }
+  h1 { font-size: 24px; }
+  .readers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .reader { height: 580px; min-width: 0; }
+  button { margin: 8px 8px 8px 0; padding: 8px 12px; font: inherit; }
+  pre { white-space: pre-wrap; }
+  @media (max-width: 850px) { .readers { grid-template-columns: 1fr; } }
+</style>
+<h1>soclib browser checks</h1>
+<p id="status" role="status">Loading the packaged library…</p>
+<button id="check" disabled>Run browser checks</button>
+<button id="dispose" disabled>Dispose readers</button>
+<pre id="results"></pre>
+<div class="readers"><div class="reader" id="first"></div><div class="reader" id="second"></div></div>
+<script type="module">
+import { createReader, mountReader } from '/index.js'
+async function run() {
+const status = document.querySelector('#status')
+const output = document.querySelector('#results')
+const checks = []
+const check = (value, message) => {
+  if (!value) throw new Error(message)
+  checks.push(message)
+  output.textContent = checks.map((text) => `PASS: ${text}`).join('\n')
+}
+let readers = []
+try {
+  const errors = []
+  const first = await mountReader(document.querySelector('#first'), { theme: 'dark', onError: (error) => errors.push(error) })
+  const second = await mountReader(document.querySelector('#second'), { theme: 'light', onError: (error) => errors.push(error) })
+  readers = [first, second]
+  status.textContent = 'Two independent readers are ready.'
+  document.querySelector('#check').disabled = false
+  document.querySelector('#dispose').disabled = false
+  document.querySelector('#check').onclick = async () => {
+    try {
+      check(first.text.includes('login'), 'The packaged WASM reader opens the welcome screen')
+      check(second.text.includes('login'), 'A second reader runs independently')
+      await first.key('ArrowUp')
+      await first.key('Enter')
+      check(first.text.includes('demo') && !first.text.includes('socli > login'), 'The public keyboard API opens the offline demo')
+      check(second.text.includes('socli > login'), 'Input does not affect the other instance')
+      first.focus()
+      check(document.querySelector('#first').firstElementChild.shadowRoot.activeElement?.id === 'screen', 'Keyboard focus stays inside the reader')
+      await first.setTheme('light')
+      check(first.text.includes('demo') && !first.text.includes('socli > login'), 'Theme changes preserve the demo session')
+      await first.setTheme('dark')
+      const host = document.querySelector('#first')
+      host.style.height = '320px'
+      first.resize()
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      check(host.firstElementChild.shadowRoot.querySelectorAll('.wasm-row').length < 24, 'Resizing fits the host container')
+      host.style.height = '580px'
+      first.resize()
+      const core = await createReader({ cols: 80, rows: 24, config: '[ui]\nicons="unicode"' })
+      check(core.text.includes('socli > login'), 'The headless API returns a text frame')
+      await core.resize(40, 16)
+      check(core.frame.frame instanceof Uint8Array, 'The headless API returns cell updates')
+      core.dispose()
+      await core.tick().then(() => { throw new Error('disposed core accepted input') }, () => {})
+      check(errors.length === 0, 'The mounted readers report no worker errors')
+      status.textContent = `${checks.length} browser checks passed.`
+      document.querySelector('#check').disabled = true
+    } catch (error) {
+      status.textContent = `FAILED: ${error.message}`
+      output.textContent += `\n${error.stack}`
+    }
+  }
+  document.querySelector('#dispose').onclick = async () => {
+    first.dispose()
+    first.dispose()
+    second.dispose()
+    check(!document.querySelector('#first').children.length && !document.querySelector('#second').children.length, 'Disposal removes only the library-owned elements')
+    await first.key('j').then(() => { throw new Error('disposed reader accepted input') }, () => {})
+    check(true, 'Disposed reader commands reject')
+    status.textContent = `${checks.length} browser checks passed; readers disposed.`
+    document.querySelector('#dispose').disabled = true
+  }
+} catch (error) {
+  readers.forEach((reader) => reader.dispose())
+  status.textContent = `FAILED: ${error.message}`
+  output.textContent = error.stack
+}
+}
+void run()
+</script>
+</html>
