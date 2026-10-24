@@ -1,0 +1,73 @@
+name: Build web release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Setup Rust
+        run: rustup show active-toolchain && rustup target add wasm32-unknown-unknown
+      - name: Install wasm-opt
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+      - name: Check the wasm graph
+        run: |
+          bad=$(cargo tree --locked --target wasm32-unknown-unknown --no-default-features --prefix none | grep -E '^(crossterm|signal-hook|reqwest|viuer|ratatui-image) ' || true)
+          if [ -n "$bad" ]; then
+            echo "$bad" >&2
+            echo "a native crate entered the wasm graph" >&2
+            exit 1
+          fi
+      - name: Build the reader
+        run: |
+          cargo build --locked --release --no-default-features --target wasm32-unknown-unknown --lib
+          mkdir -p website/public/wasm
+          wasm-opt -Oz target/wasm32-unknown-unknown/release/socli.wasm -o website/public/wasm/socli.wasm
+      - name: Install dependencies
+        working-directory: website
+        run: bun install --frozen-lockfile
+      - name: Build
+        working-directory: website
+        env:
+          NODE_ENV: production
+          SITE_ORIGIN: https://socli.sh
+          SITE_BASE: ${{ vars.SITE_BASE || '/' }}
+        run: bun run docs:build
+      - name: Package the website and npm module
+        env:
+          VERSION: ${{ inputs.version }}
+          NPM_PACKAGE_NAME: ${{ vars.NPM_PACKAGE_NAME }}
+        run: |
+          mkdir -p artifacts
+          tar -czf "artifacts/socli-${VERSION}-web.tar.gz" -C website/.vitepress/dist .
+          bun scripts/release.ts web website/public/wasm/socli.wasm release/npm
+          npm pack ./release/npm --pack-destination artifacts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-web
+          path: artifacts/*
+          if-no-files-found: error
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: website/.vitepress/dist
