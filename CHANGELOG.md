@@ -6,6 +6,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [0.1.1] - 2026-10-25
 
+- Made the help-output test follow the package version during releases.
+
 - Fixed cross installation by verifying its archive against a pinned SHA-256 instead of a nonexistent checksum file.
 - Added manual release-build verification without publication.
 - Included the brand-page assets in clean website builds.

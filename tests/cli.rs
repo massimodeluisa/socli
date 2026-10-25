@@ -517,7 +517,8 @@ fn nerd_icons_when_asked() {
 #[test]
 fn help_lists_commands_and_flags() {
     let text = stdout_of(socli().arg("--help").output().unwrap());
-    assert!(text.contains("socli 0.1.0"), "{text}");
+    let version = concat!("socli ", env!("CARGO_PKG_VERSION"));
+    assert!(text.contains(version), "{text}");
     assert!(
         text.contains("X, Bluesky, dev/null, Threads and Mastodon in your terminal"),
         "{text}"
