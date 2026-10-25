@@ -129,6 +129,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-user
           mkdir -p "$RUNNER_TEMP/release-tools/cross" "$RUNNER_TEMP/release-tools/nfpm"
           gh release download v0.2.5 --repo cross-rs/cross --pattern cross-x86_64-unknown-linux-musl.tar.gz --dir "$RUNNER_TEMP/release-tools/cross"
           echo "a486cefa6cb486971b97be321ea9dfc2e90c1979550295314a368f53fab6d588  $RUNNER_TEMP/release-tools/cross/cross-x86_64-unknown-linux-musl.tar.gz" | sha256sum --check
@@ -142,7 +144,15 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           cross build --locked --release --bin socli --target "$TARGET"
-          cross run --locked --release --bin socli --target "$TARGET" -- --version | grep -Fx "socli $VERSION"
+          runner=()
+          case "$TARGET" in
+            armv7-*) runner=(qemu-arm) ;;
+            aarch64-*) runner=(qemu-aarch64) ;;
+            i686-*) runner=(qemu-i386) ;;
+          esac
+          "${runner[@]}" "target/$TARGET/release/socli" --version | grep -Fx "socli $VERSION"
+          "${runner[@]}" "target/$TARGET/release/socli" feed --demo --json > "$RUNNER_TEMP/demo.json"
+          python3 -c 'import json, os; posts = json.load(open(os.environ["RUNNER_TEMP"] + "/demo.json")); assert any(p["network"] == "devnull" for p in posts)'
       - name: Build and smoke test macOS
         if: runner.os == 'macOS'
         run: |
