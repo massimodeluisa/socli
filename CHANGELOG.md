@@ -4,6 +4,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Added tag-gated deployment to the existing Cloudflare site worker and made the hosting target explicit.
+
 - Resolved npm tarball paths before publication so npm did not interpret them as GitHub repositories.
 
 ## [0.1.1] - 2026-10-25
