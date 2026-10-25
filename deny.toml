@@ -1,0 +1,36 @@
+# cargo-deny 0.20 configuration. Starter defaults, with duplicate versions warned.
+
+[advisories]
+yanked = "warn"
+# paste is unmaintained only through ratatui. A direct dependency still fails.
+unmaintained = "workspace"
+ignore = []
+
+[licenses]
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+    "CDLA-Permissive-2.0",
+    "Unlicense",
+]
+# viuer 0.11.0 depends on ansi_colours 1.2.3, whose only license is LGPL-3.0-or-later.
+exceptions = [
+    { allow = ["LGPL-3.0-or-later"], crate = "ansi_colours" },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

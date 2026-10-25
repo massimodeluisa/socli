@@ -1,0 +1,4 @@
+# Wave 1 ceiling. The longest function measured for this step is 835 lines.
+# 850 keeps `too_many_lines` from firing on that function. The parent
+# re-measures and lowers this. It is a ceiling, not a target.
+too-many-lines-threshold = 850
