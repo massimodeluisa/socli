@@ -1,6 +1,6 @@
 # Releasing socli
 
-Pushing a release tag is the only event that publishes socli. `.github/workflows/release.yml` builds the tagged commit, publishes its GitHub release and npm packages, updates the Homebrew tap, and deploys the website. Branch pushes and pull requests run `.github/workflows/ci.yml` without publishing. The web workflow is reusable and has no branch, tag, or manual trigger of its own.
+Pushing a release tag is the only event that publishes socli. `.github/workflows/release.yml` builds the tagged commit, publishes its GitHub release and npm packages, updates a Homebrew tap when configured, and deploys the website. Branch pushes and pull requests run `.github/workflows/ci.yml` without publishing. The web workflow is reusable and has no branch, tag, or manual trigger of its own.
 
 ## Release outputs
 
@@ -18,7 +18,7 @@ Every release builds the following targets. Linux builds use musl so the distrib
 
 The Windows targets `i686-pc-windows-msvc` and `x86_64-pc-windows-msvc` remain commented out in the matrix. Enabling them also requires adapting packaging and validating authentication and terminal behavior on Windows.
 
-The GitHub release includes every package, `socli.rb`, and `SHA256SUMS`. Native archives contain the executable, README, changelog, license, and third-party notices. Linux packages install the executable under `/usr/bin` and include the license and notices. nFPM translates the matrix architecture into each package format's architecture name. Both macOS builds target macOS 12 or newer and include the embedded Swift authentication helper.
+The GitHub release includes every package, `socli.rb`, the source-build candidate `socli-core.rb`, a source archive, and `SHA256SUMS`. Native archives contain the executable, README, changelog, license, and third-party notices. Linux packages install the executable under `/usr/bin` and include the license and notices. nFPM translates the matrix architecture into each package format's architecture name. Both macOS builds target macOS 12 or newer and include the embedded Swift authentication helper.
 
 The native npm package defaults to `socli`. It exposes the `socli` command, so both `npx socli@latest --demo` and `bunx socli@latest --demo` run the native reader after publication. A global npm installation also installs `socli` on your command path. The [CLI package README](../packages/cli/README.md) covers installation and supported platforms.
 
@@ -28,13 +28,14 @@ The browser npm package is `soclib`. It includes the WebAssembly engine, the sha
 
 ## Configure publishing
 
-Complete these settings in the GitHub repository before pushing a release tag. The workflow validates the package maintainer for every release and the Homebrew destination before building a stable release.
+Complete these settings in the GitHub repository before pushing a release tag. The workflow validates the package maintainer for every release. If `HOMEBREW_TAP` is set, it also validates that destination and its publishing credentials before building a stable release.
 
 | Setting | Kind | Purpose |
 | --- | --- | --- |
 | `PACKAGE_MAINTAINER` | Actions variable | The Linux package maintainer, written as a real name and email address. |
-| `HOMEBREW_TAP` | Actions variable | An existing, initialized tap repository, written as `owner/repository`. |
-| `HOMEBREW_TAP_TOKEN` | Actions secret | A token with Contents write access to that tap. The source repository's `GITHUB_TOKEN` cannot write to another repository. |
+| `HOMEBREW_TAP` | Actions variable, optional | An existing, initialized tap repository, written as `owner/repository`. Leave unset when distributing through Homebrew Core. |
+| `HOMEBREW_TAP_SSH_KEY` | Actions secret, required with the project tap | A deploy key with write access restricted to the tap repository. |
+| `HOMEBREW_TAP_TOKEN` | Actions secret, alternative | A token with Contents write access to the tap. The source repository's `GITHUB_TOKEN` cannot write to another repository. |
 | `NPM_PACKAGE_NAME` | Actions variable, optional | Overrides the npm package name in `packages/web/package.json`. |
 | `NPM_CLI_PACKAGE_NAME` | Actions variable, optional | Overrides the launcher name in `packages/cli/package.json` and determines its six platform package names. |
 | `NPM_TOKEN` | Actions secret, optional | A granular publishing token for bootstrapping or when npm trusted publishing is unavailable. |
@@ -55,9 +56,9 @@ Protect `main` with CI checks and protect release tags with a tag ruleset. Use a
 5. Create an annotated `vX.Y.Z` tag on the prepared commit and push that tag to the GitHub publishing repository. Confirm the destination with `git remote -v`: a proxy remote is not evidence that GitHub received the push.
 6. Follow the Release workflow. Validation rejects malformed tags, version mismatches, missing release notes, and commits outside `main`'s history. A stable version must be newer than the published stable versions returned by GitHub. Tests run before the native and web builds.
 
-The workflow uses the Rust toolchain pinned by `rust-toolchain.toml`, locked Cargo dependencies, and the frozen website lockfile. It builds and runs `--version` for each native target, using `cross` and its emulation for Linux. Native builds and the web build must all succeed before the GitHub release becomes public. The npm job publishes the exact `.tgz` files already attached to the GitHub release. It publishes the platform packages before the launcher so the launcher's optional dependencies already exist. Homebrew updates follow npm, and Pages deploys after Homebrew succeeds.
+The workflow uses the Rust toolchain pinned by `rust-toolchain.toml`, locked Cargo dependencies, and the frozen website lockfile. It builds and runs `--version` for each native target, using `cross` and its emulation for Linux. Native builds and the web build must all succeed before the GitHub release becomes public. The npm job publishes the exact `.tgz` files already attached to the GitHub release. It publishes the platform packages before the launcher so the launcher's optional dependencies already exist. A configured Homebrew tap updates independently of npm. Pages deploys after npm succeeds and the tap update succeeds or is skipped.
 
-The first release still needs a dated changelog section. Adding this release infrastructure does not establish that the current source has already shipped.
+The dated changelog section must describe the exact tagged source.
 
 ## Prereleases and failures
 
@@ -67,7 +68,13 @@ Release runs share a concurrency group so publishing jobs from different version
 
 If npm fails partway through publishing, the retry checks every existing version's registry integrity against the local tarball. Identical packages are skipped; a version with different bytes stops the job. Authentication and registry errors also stop the job rather than being treated as missing packages.
 
-The Homebrew job writes `Formula/socli.rb` on the configured tap's default branch. The formula selects the matching macOS or 64-bit Linux archive and verifies its SHA-256. A concurrent change to an existing formula makes the update fail through GitHub's file SHA check. The tap needs an initialized branch before its first update.
+When a tap is configured, the Homebrew job writes `Formula/socli.rb` on its default branch. The formula selects the matching macOS or 64-bit Linux archive and verifies its SHA-256. With the deploy key, a concurrent change makes the Git push fail. Token-based updates use GitHub's file SHA check. The tap needs an initialized branch before its first update.
+
+The project tap is `massimodeluisa/homebrew-tap`. Install it once with `brew tap massimodeluisa/tap`, then use `brew install socli` and `brew upgrade socli`. Its deploy key can write only to that repository. GitHub's SSH host keys are fetched through its HTTPS API before connecting.
+
+Homebrew Core accepts source builds, so releases also contain `socli-core.rb` and the checksummed source archive. Rename that candidate to `Formula/s/socli.rb` in a Core contribution checkout, build it from source, run `brew test socli` and `brew audit --strict --new --online socli`, and review the formula before submitting it. The candidate uses locked Cargo dependencies and tests the offline feed without signing in.
+
+Core submission is pending eligibility under the [package acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy). A repository under 30 days old is normally ineligible. Owner submissions normally require at least 90 forks, 90 watchers, or 225 stars. The project had none of those on 2026-10-25. Acceptance remains a maintainer decision. Homebrew's [contribution instructions](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request) also require the contributor to review AI-assisted work, disclose that assistance, and answer review questions personally.
 
 Debian, RPM, and Alpine packages are published as GitHub release assets. Users can download a newer package and install it through their package manager. Automatic `apt upgrade`, `dnf upgrade`, and `apk upgrade` discovery requires a separately hosted and signed repository with package indexes and signing keys. This repository does not configure such a service. Distribution-maintained packages and Homebrew Core also have their own review and update processes; the workflow updates your tap.
 

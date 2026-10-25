@@ -42,9 +42,37 @@ This is what `--print` draws for the offline demo feed:
 
 The sample was captured with `socli --demo --print --no-prompt --width 100 --no-icons` and `NO_COLOR=1`.
 
-## Install and build
+## Install
 
-socli builds with Cargo. `rust-toolchain.toml` pins the compiler, and rustup installs it on the first build.
+Run a published version without building Rust:
+
+```sh
+npx socli
+```
+
+Or use `bunx socli`. Use Node.js 22 or newer with npm, or `bunx --bun socli` to run the launcher with Bun itself.
+
+To keep the command on your `PATH`:
+
+```sh
+npm install --global socli
+socli --version
+```
+
+Install with Homebrew through the project tap:
+
+```sh
+brew tap massimodeluisa/tap
+brew install socli
+```
+
+Package-manager installation requires a [published release](https://github.com/massimodeluisa/socli/releases), and Homebrew Core publication is pending; the project tap supplies the formula. If no release is listed, install from source:
+
+```sh
+cargo install --git https://github.com/massimodeluisa/socli
+```
+
+From a checkout:
 
 ```sh
 git clone https://github.com/massimodeluisa/socli
@@ -52,7 +80,17 @@ cd socli
 cargo build --release
 ```
 
-The binary is `target/release/socli`. Copy it to a directory on your `PATH` to call it as `socli`.
+The binary is `target/release/socli`. Copy it onto your `PATH` to call it as `socli`.
+
+`rust-toolchain.toml` pins the compiler to `1.99.1`. rustup installs that compiler on the first build. The crate's minimum is Rust 1.89.
+
+Shell completions:
+
+```sh
+socli completions zsh > ~/.zfunc/_socli
+```
+
+The argument is `bash`, `zsh`, `fish`, `elvish` or `powershell`. The rest of the install notes are in [website/docs/install.md](website/docs/install.md).
 
 ## First run
 

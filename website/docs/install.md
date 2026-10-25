@@ -1,11 +1,50 @@
 ---
 title: Install
-description: How to install socli from git or from a checkout, and how to get shell completions and icons.
+description: Run socli with npx or bunx, install the native command, or build it from source.
 ---
 
 # Install
 
-socli is a Rust program, and it runs as a terminal binary. You install it with cargo, or you build it from a checkout.
+socli runs as a native terminal binary. Use `npx socli` or `bunx socli` to run a published version without building Rust, or install the command on your `PATH`.
+
+Package-manager installation requires a [published release](https://github.com/massimodeluisa/socli/releases). If no release is listed, [build from source](#from-git). Homebrew uses the project tap until a Core formula is accepted.
+
+## Run with npm or Bun
+
+```sh
+npx socli
+```
+
+With Bun:
+
+```sh
+bunx socli
+```
+
+Pass arguments after the package name, for example `npx socli --demo` or `bunx socli login bluesky`. npm selects the native executable for your operating system and CPU. Use Node.js 22 or newer with npm. `bunx --bun socli` runs the launcher with Bun itself.
+
+## Install the command
+
+```sh
+npm install --global socli
+socli --version
+```
+
+A global installation makes `socli` available directly, so the other documentation examples work without an `npx` or `bunx` prefix. Update it with `npm update --global socli`.
+
+## Homebrew
+
+Install from the project tap:
+
+```sh
+brew tap massimodeluisa/tap
+brew install socli
+socli --demo
+```
+
+You can also install in one command with `brew install massimodeluisa/tap/socli`. Update the installed version with `brew update` followed by `brew upgrade socli`.
+
+A fresh Homebrew installation needs the tap because socli is not in Homebrew Core. Core acceptance requires a stable release and evidence of public use. The [Homebrew acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy) normally excludes repositories under 30 days old and applies higher popularity thresholds to self-submissions. Each socli release includes a source formula for a future Core submission.
 
 ## From git
 

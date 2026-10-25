@@ -45,14 +45,19 @@ jobs:
         env:
           PACKAGE_MAINTAINER: ${{ vars.PACKAGE_MAINTAINER }}
         run: ': "${PACKAGE_MAINTAINER:?set PACKAGE_MAINTAINER to a name and email}"'
-      - name: Check stable release configuration
-        if: steps.release.outputs.prerelease == 'false'
+      - name: Check configured Homebrew tap
+        if: steps.release.outputs.prerelease == 'false' && vars.HOMEBREW_TAP != ''
         env:
           HOMEBREW_TAP: ${{ vars.HOMEBREW_TAP }}
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || github.token }}
+          HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           : "${HOMEBREW_TAP:?set HOMEBREW_TAP to owner/repo}"
-          : "${GH_TOKEN:?set HOMEBREW_TAP_TOKEN with write access to the tap}"
+          if [[ -z "$HOMEBREW_TAP_SSH_KEY" && -z "$HOMEBREW_TAP_TOKEN" ]]; then
+            echo "Configure HOMEBREW_TAP_SSH_KEY or HOMEBREW_TAP_TOKEN" >&2
+            exit 1
+          fi
           gh api "repos/${HOMEBREW_TAP}" --jq .default_branch
 
   test:
@@ -185,6 +190,8 @@ jobs:
             npm pack "./$package" --pack-destination artifacts
           done
           bun scripts/release.ts formula "$VERSION" "$GITHUB_REPOSITORY" artifacts
+          curl --fail --location --retry 3 "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz" --output "artifacts/socli-$VERSION-source.tar.gz"
+          bun scripts/release.ts source-formula "$VERSION" "$GITHUB_REPOSITORY" "artifacts/socli-$VERSION-source.tar.gz" artifacts/socli-core.rb
           bun scripts/release.ts checksums artifacts
       - uses: actions/upload-artifact@v4
         with:
@@ -236,8 +243,8 @@ jobs:
           bun scripts/publish-npm.ts artifacts
 
   homebrew:
-    needs: [validate, github-release, npm]
-    if: needs.validate.outputs.prerelease == 'false'
+    needs: [validate, github-release]
+    if: needs.validate.outputs.prerelease == 'false' && vars.HOMEBREW_TAP != ''
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -249,7 +256,8 @@ jobs:
           path: artifacts
       - name: Update tap formula
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN || github.token }}
+          HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
           HOMEBREW_TAP: ${{ vars.HOMEBREW_TAP }}
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
@@ -257,8 +265,12 @@ jobs:
           bash scripts/update-homebrew.sh
 
   deploy-pages:
-    needs: [validate, homebrew]
-    if: needs.validate.outputs.prerelease == 'false'
+    needs: [validate, npm, homebrew]
+    if: >-
+      !cancelled() &&
+      needs.validate.outputs.prerelease == 'false' &&
+      needs.npm.result == 'success' &&
+      (needs.homebrew.result == 'success' || needs.homebrew.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       pages: write

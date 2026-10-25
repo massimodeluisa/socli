@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { homebrewFormula, nativeNpmPackages, npmPlatforms, releaseNotes, releaseVersion, validateReleaseOrder, validateVersions } from './release'
+import { homebrewSourceFormula, homebrewFormula, nativeNpmPackages, npmPlatforms, releaseNotes, releaseVersion, validateReleaseOrder, validateVersions } from './release'
 import { selectPlatform, resolveBinary } from '../packages/cli/bin/socli.js'
 import { npmPublishPlan, publicationState } from './publish-npm'
 import { execFileSync } from 'node:child_process'
@@ -56,6 +56,18 @@ test('Homebrew downloads the release archives and verifies their actual hashes',
   expect(formula.match(/sha256 /g)?.length).toBe(4)
   expect(formula).toContain('https://github.com/owner/project/releases/download/v1.2.3/socli-1.2.3-x86_64-apple-darwin.tar.gz')
   expect(formula).toContain(createHash('sha256').update('aarch64-unknown-linux-musl').digest('hex'))
+})
+
+test('Core candidate builds locked sources and exercises offline output', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'socli-core-'))
+  const archive = join(directory, 'source.tar.gz')
+  await writeFile(archive, 'immutable source archive')
+  const formula = await homebrewSourceFormula('1.2.3', 'owner/project', archive)
+  expect(formula).toContain('https://github.com/owner/project/archive/refs/tags/v1.2.3.tar.gz')
+  expect(formula).toContain(createHash('sha256').update('immutable source archive').digest('hex'))
+  expect(formula).toContain('"cargo", "fetch", *std_cargo_fetch_args')
+  expect(formula).toContain('"cargo", "install", *std_cargo_args, "--bin", "socli"')
+  expect(formula).toContain('socli feed --demo --json')
 })
 
 test('web distribution contains a valid wasm module and installable npm metadata', async () => {
