@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags: ['v*']
 
@@ -17,7 +18,7 @@ defaults:
 
 jobs:
   validate:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.release.outputs.version }}
@@ -37,6 +38,9 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            RELEASE_TAG="v$(bun -e 'console.log(Bun.TOML.parse(await Bun.file("Cargo.toml").text()).package.version)')"
+          fi
           git merge-base --is-ancestor HEAD origin/main
           gh release list --limit 100 --json tagName,isDraft,isPrerelease > "$RUNNER_TEMP/published-releases.json"
           export PUBLISHED_RELEASES="$RUNNER_TEMP/published-releases.json"
@@ -126,8 +130,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/release-tools/cross" "$RUNNER_TEMP/release-tools/nfpm"
-          gh release download v0.2.5 --repo cross-rs/cross --pattern cross-x86_64-unknown-linux-musl.tar.gz --pattern checksums.txt --dir "$RUNNER_TEMP/release-tools/cross"
-          (builtin cd "$RUNNER_TEMP/release-tools/cross" && sha256sum --check --ignore-missing checksums.txt && tar -xzf cross-x86_64-unknown-linux-musl.tar.gz)
+          gh release download v0.2.5 --repo cross-rs/cross --pattern cross-x86_64-unknown-linux-musl.tar.gz --dir "$RUNNER_TEMP/release-tools/cross"
+          echo "a486cefa6cb486971b97be321ea9dfc2e90c1979550295314a368f53fab6d588  $RUNNER_TEMP/release-tools/cross/cross-x86_64-unknown-linux-musl.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/release-tools/cross/cross-x86_64-unknown-linux-musl.tar.gz" -C "$RUNNER_TEMP/release-tools/cross"
           gh release download v2.48.0 --repo goreleaser/nfpm --pattern nfpm_2.48.0_Linux_x86_64.tar.gz --dir "$RUNNER_TEMP/release-tools/nfpm"
           echo "6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750  $RUNNER_TEMP/release-tools/nfpm/nfpm_2.48.0_Linux_x86_64.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/release-tools/nfpm/nfpm_2.48.0_Linux_x86_64.tar.gz" -C "$RUNNER_TEMP/release-tools/nfpm"
@@ -158,6 +163,7 @@ jobs:
       version: ${{ needs.validate.outputs.version }}
 
   github-release:
+    if: github.event_name == 'push'
     needs: [validate, native, web]
     runs-on: ubuntu-24.04
     permissions:

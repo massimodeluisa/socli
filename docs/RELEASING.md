@@ -1,6 +1,6 @@
 # Releasing socli
 
-Pushing a release tag is the only event that publishes socli. `.github/workflows/release.yml` builds the tagged commit, publishes its GitHub release and npm packages, updates a Homebrew tap when configured, and deploys the website. Branch pushes and pull requests run `.github/workflows/ci.yml` without publishing. The web workflow is reusable and has no branch, tag, or manual trigger of its own.
+Pushing a release tag is the only event that publishes socli. A manual Release workflow run verifies the current source and builds artifacts without publishing. `.github/workflows/release.yml` builds the tagged commit, publishes its GitHub release and npm packages, updates a Homebrew tap when configured, and deploys the website. Branch pushes and pull requests run `.github/workflows/ci.yml` without publishing. The web workflow is reusable and has no branch, tag, or manual trigger of its own.
 
 ## Release outputs
 
