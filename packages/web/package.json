@@ -1,6 +1,6 @@
 {
   "name": "soclib",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The socli browser reader and WebAssembly engine",
   "type": "module",
   "license": "MIT",
