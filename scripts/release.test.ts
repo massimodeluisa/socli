@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { homebrewSourceFormula, homebrewFormula, nativeNpmPackages, npmPlatforms, releaseNotes, releaseVersion, validateReleaseOrder, validateVersions } from './release'
 import { selectPlatform, resolveBinary } from '../packages/cli/bin/socli.js'
@@ -174,6 +174,8 @@ test('native npm packages pin platform versions and execute through the npm bin 
     execFileSync('npm', ['pack', join(output, platform), '--pack-destination', assets, '--json'], { stdio: 'pipe' })
   }
   const plan = await npmPublishPlan(assets)
+  const relativePlan = JSON.parse(execFileSync('bun', ['-e', `import { npmPublishPlan } from ${JSON.stringify(join(import.meta.dir, 'publish-npm.ts'))}; console.log(JSON.stringify((await npmPublishPlan('assets')).map(item => item.path)))`], { cwd: fixture, encoding: 'utf8' }))
+  expect(relativePlan.every((path) => isAbsolute(path))).toBe(true)
   expect(plan.at(-1)?.manifest.name).toBe(wrapper.name)
   expect(plan.map((item) => item.manifest.name)).toHaveLength(7)
   const current = npmPlatforms.find((item) => item.os === process.platform && item.cpu === process.arch)
