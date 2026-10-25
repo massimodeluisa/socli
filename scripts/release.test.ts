@@ -138,19 +138,21 @@ describe('native npm launcher', () => {
     expect(() => selectPlatform('linux', 'arm', 6)).toThrow('ARMv7')
     expect(() => selectPlatform('linux', 'arm')).toThrow('ARMv7')
   })
-  test('requires the correct installed binary and verifies its hash', async () => {
+  test('uses the bundled binary and rejects missing files, tampering and escaped paths', async () => {
     const fixture = await mkdtemp(join(tmpdir(), 'socli-npm-binary-'))
-    const binary = join(fixture, 'socli')
+    await mkdir(join(fixture, 'native/linux-x64'), { recursive: true })
+    const binary = join(fixture, 'native/linux-x64/socli')
+    const platforms = { 'linux-x64': { path: 'native/linux-x64/socli', sha256: createHash('sha256').update('native executable fixture').digest('hex') } }
+    expect(() => resolveBinary(platforms, 'linux', 'x64', undefined, fixture)).toThrow('bundled')
     await writeFile(binary, 'native executable fixture')
-    const platforms = { 'linux-x64': { package: '@test/socli-linux-x64', sha256: createHash('sha256').update('native executable fixture').digest('hex') } }
-    expect(resolveBinary(platforms, 'linux', 'x64', undefined, () => binary)).toBe(binary)
-    expect(() => resolveBinary(platforms, 'linux', 'x64', undefined, () => { throw new Error('missing') })).toThrow('optional dependencies')
+    expect(resolveBinary(platforms, 'linux', 'x64', undefined, fixture)).toBe(binary)
     await writeFile(binary, 'different executable')
-    expect(() => resolveBinary(platforms, 'linux', 'x64', undefined, () => binary)).toThrow('checksum')
+    expect(() => resolveBinary(platforms, 'linux', 'x64', undefined, fixture)).toThrow('checksum')
+    expect(() => resolveBinary({ 'linux-x64': { ...platforms['linux-x64'], path: '../socli' } }, 'linux', 'x64', undefined, fixture)).toThrow('metadata')
   })
 })
 
-test('native npm packages pin platform versions and execute through the npm bin symlink', async () => {
+test('one native npm package contains all six executables and runs without optional dependencies', async () => {
   const fixture = await mkdtemp(join(tmpdir(), 'socli-npm-release-'))
   const assets = join(fixture, 'assets')
   await mkdir(assets)
@@ -164,35 +166,33 @@ test('native npm packages pin platform versions and execute through the npm bin 
   const output = join(fixture, 'npm')
   await nativeNpmPackages(assets, output)
   const wrapper = JSON.parse(await readFile(join(output, 'cli/package.json'), 'utf8'))
-  expect(Object.keys(wrapper.optionalDependencies)).toHaveLength(6)
+  expect(wrapper.optionalDependencies).toBeUndefined()
+  expect(wrapper.files).toContain('native')
+  const platforms = JSON.parse(await readFile(join(output, 'cli/platforms.json'), 'utf8'))
   for (const platform of npmPlatforms) {
-    const manifest = JSON.parse(await readFile(join(output, platform.key, 'package.json'), 'utf8'))
-    expect(wrapper.optionalDependencies[manifest.name]).toBe(version)
-    expect(manifest.os).toEqual([platform.os])
-    expect(manifest.cpu).toEqual([platform.cpu])
-    const entry = JSON.parse(await readFile(join(output, 'cli/platforms.json'), 'utf8'))[platform.key]
-    expect(entry.sha256).toBe(createHash('sha256').update(await readFile(join(output, platform.key, 'bin/socli'))).digest('hex'))
+    const entry = platforms[platform.key]
+    expect(entry.path).toBe(`native/${platform.key}/socli`)
+    expect(entry.sha256).toBe(createHash('sha256').update(await readFile(join(output, 'cli', entry.path))).digest('hex'))
   }
-  for (const platform of [...npmPlatforms.map((item) => item.key), 'cli']) {
-    execFileSync('npm', ['pack', join(output, platform), '--pack-destination', assets, '--json'], { stdio: 'pipe' })
-  }
+  execFileSync('npm', ['pack', join(output, 'cli'), '--pack-destination', assets, '--json'], { stdio: 'pipe' })
   const plan = await npmPublishPlan(assets)
   const relativePlan = JSON.parse(execFileSync('bun', ['-e', `import { npmPublishPlan } from ${JSON.stringify(join(import.meta.dir, 'publish-npm.ts'))}; console.log(JSON.stringify((await npmPublishPlan('assets')).map(item => item.path)))`], { cwd: fixture, encoding: 'utf8' }))
   expect(relativePlan.every((path) => isAbsolute(path))).toBe(true)
-  expect(plan.at(-1)?.manifest.name).toBe(wrapper.name)
-  expect(plan.map((item) => item.manifest.name)).toHaveLength(7)
-  const current = npmPlatforms.find((item) => item.os === process.platform && item.cpu === process.arch)
-  if (!current) throw new Error('test host has no native npm package')
-  const manifest = JSON.parse(await readFile(join(output, current.key, 'package.json'), 'utf8'))
-  const binaryTarball = plan.find((item) => item.manifest.name === manifest.name)?.path
+  expect(plan[0].manifest.name).toBe('soclish')
+  expect(plan).toHaveLength(1)
   const installed = join(fixture, 'installed')
-  execFileSync('npm', ['install', '--offline', '--ignore-scripts', '--no-audit', '--no-fund', '--prefix', installed, '--cache', join(fixture, 'cache'), plan.at(-1).path, binaryTarball], { stdio: 'pipe' })
+  execFileSync('npm', ['install', '--offline', '--ignore-scripts', '--omit=optional', '--no-audit', '--no-fund', '--prefix', installed, '--cache', join(fixture, 'cache'), plan[0].path], { stdio: 'pipe' })
   const child = Bun.spawn(['node', join(installed, 'node_modules/.bin/socli'), '--example', 'a b', '$(literal)'], {
     env: { ...process.env, SOCLI_TEST_EXIT: '7' }, stdout: 'pipe', stderr: 'pipe',
   })
   expect(await new Response(child.stderr).text()).toBe('')
   expect(JSON.parse(await new Response(child.stdout).text())).toEqual(['--example', 'a b', '$(literal)'])
   expect(await child.exited).toBe(7)
+  const helper = join(fixture, 'obsolete/package')
+  await mkdir(helper, { recursive: true })
+  await writeFile(join(helper, 'package.json'), JSON.stringify({ name: 'socli-obsolete-helper', version }))
+  execFileSync('tar', ['-czf', join(assets, 'obsolete.tgz'), '-C', join(fixture, 'obsolete'), 'package'])
+  await expect(npmPublishPlan(assets)).rejects.toThrow('only the bundled CLI and browser library')
 }, 30000)
 
 test('npm publication retries only skip versions with identical bytes', () => {

@@ -2,14 +2,14 @@
 
 soclib embeds the socli reader in a browser application. It runs the same Rust reader as the terminal client, compiled to WebAssembly inside a worker, and paints its cell updates with the website's renderer. The package includes the worker, styles, fonts, TypeScript declarations, and WASM module. Each mounted reader has its own session and shadow root.
 
-The native terminal package is `socli`, available through `npx socli` or `bunx socli` after publication. The tag release workflow publishes both packages at the same version. Until the first release, use the output of the local packaging command below.
+The native terminal package is `soclish`, available through `npx soclish` or `bunx soclish` after publication. The tag release workflow publishes both packages at the same version. Until the first release, use the output of the local packaging command below.
 
 ## Mount the reader
 
-Install `soclib` in your browser project after publication:
+Install `@massimodeluisa/soclib` in your browser project after publication:
 
 ```sh
-npm install soclib
+npm install @massimodeluisa/soclib
 ```
 
 Give the reader a container with a defined height, then mount it:
@@ -19,7 +19,7 @@ Give the reader a container with a defined height, then mount it:
 ```
 
 ```js
-import { mountReader } from 'soclib'
+import { mountReader } from '@massimodeluisa/soclib'
 
 const reader = await mountReader(document.querySelector('#reader'), {
   theme: 'auto',
@@ -55,7 +55,7 @@ Browser sessions cannot inherit terminal credential files, browser-session cooki
 `createReader` starts the worker without mounting a DOM view:
 
 ```js
-import { createReader } from 'soclib'
+import { createReader } from '@massimodeluisa/soclib'
 
 const reader = await createReader({ cols: 80, rows: 24 })
 console.log(reader.text)
@@ -71,7 +71,7 @@ The encoded key `0x80` is ArrowUp and `0x0d` is Enter. A frame contains the chan
 
 Default asset URLs resolve relative to the installed library. Bundlers that recognize `new URL(..., import.meta.url)` and module workers can relocate them. When your build serves assets elsewhere, pass absolute or page-relative `wasmUrl` and `workerUrl`, plus `styleUrl` for a mounted reader. Serve the files with their correct content types, and permit the worker, WASM compilation, fonts, and styles in your site's content security policy. The font licenses are included under `fonts/`.
 
-`wasmUrl`, `workerUrl`, and `styleUrl` are exported for asset discovery. The package also exports the `soclib/socli.wasm`, `soclib/reader.worker.js`, and `soclib/style.css` subpaths. Type declarations are included at the main entry point.
+`wasmUrl`, `workerUrl`, and `styleUrl` are exported for asset discovery. The package also exports the `@massimodeluisa/soclib/socli.wasm`, `@massimodeluisa/soclib/reader.worker.js`, and `@massimodeluisa/soclib/style.css` subpaths. Type declarations are included at the main entry point.
 
 `instantiate(imports, url)` remains available when you supply the engine's entire host interface yourself. It returns the standard WebAssembly `{ module, instance }` result. The `env` imports are `socli_millis`, `socli_mono`, `socli_http`, `socli_config_read`, `socli_config_write`, `socli_random`, and `socli_page`. HTTP is synchronous inside the engine, so run it in a worker. The mounted and headless APIs already do this. The shared [reader worker](https://github.com/massimodeluisa/socli/blob/main/website/.vitepress/theme/reader.worker.ts) implements the host imports, and the [renderer](https://github.com/massimodeluisa/socli/blob/main/website/.vitepress/theme/wasm-reader.ts) implements the cell view. Use worker and WASM assets from the same release.
 

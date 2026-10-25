@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto'
 import { readFileSync, realpathSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
@@ -16,26 +16,27 @@ export function selectPlatform(platform, arch, armVersion) {
   return key
 }
 
-export function resolveBinary(platforms, platform, arch, armVersion, resolve) {
+export function resolveBinary(platforms, platform, arch, armVersion, root) {
   const key = selectPlatform(platform, arch, armVersion)
   const entry = platforms[key]
-  if (!entry) throw new Error(`socli release is missing binary metadata for ${key}`)
-  let binary
+  if (!entry || entry.path !== `native/${key}/socli`) throw new Error(`socli release is missing binary metadata for ${key}`)
+  const binary = join(root, entry.path)
+  let bytes
   try {
-    binary = resolve(`${entry.package}/bin/socli`)
+    bytes = readFileSync(binary)
   } catch {
-    throw new Error(`socli needs ${entry.package}; reinstall with optional dependencies enabled (npm install --include=optional)`)
+    throw new Error(`socli release is missing its bundled ${key} executable; reinstall soclish`)
   }
-  const hash = createHash('sha256').update(readFileSync(binary)).digest('hex')
-  if (hash !== entry.sha256) throw new Error(`socli binary checksum failed for ${entry.package}; reinstall the package`)
+  const hash = createHash('sha256').update(bytes).digest('hex')
+  if (hash !== entry.sha256) throw new Error(`socli binary checksum failed for ${key}; reinstall soclish`)
   return binary
 }
 
 function main() {
   try {
     const platforms = JSON.parse(readFileSync(new URL('../platforms.json', import.meta.url), 'utf8'))
-    const require = createRequire(import.meta.url)
-    const binary = resolveBinary(platforms, process.platform, process.arch, process.config.variables.arm_version, require.resolve)
+    const root = fileURLToPath(new URL('../', import.meta.url))
+    const binary = resolveBinary(platforms, process.platform, process.arch, process.config.variables.arm_version, root)
     const result = spawnSync(binary, process.argv.slice(2), { stdio: 'inherit' })
     if (result.error) throw result.error
     if (result.signal) process.kill(process.pid, result.signal)

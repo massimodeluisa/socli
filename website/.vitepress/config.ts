@@ -15,7 +15,7 @@ const base = (() => {
 const description =
   'Cross-platform TUI social media client for X, Bluesky, dev/null, Threads and Mastodon.'
 
-const installCommand = 'npx socli'
+const installCommand = 'npx soclish'
 
 const readerHome = `${base}web/`
 const readerBare = `${base}web`

@@ -250,7 +250,7 @@ jobs:
         with:
           name: distribution
           path: artifacts
-      - name: Publish platform binaries, browser engine and CLI launcher
+      - name: Publish bundled soclish and browser library
         env:
           NPM_TAG: ${{ needs.validate.outputs.npm_tag }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

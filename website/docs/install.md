@@ -5,32 +5,32 @@ description: Run socli with npx or bunx, install the native command, or build it
 
 # Install
 
-socli runs as a native terminal binary. Use `npx socli` or `bunx socli` to run a published version without building Rust, or install the command on your `PATH`.
+socli runs as a native terminal binary. Use `npx soclish` or `bunx soclish` to run a published version without building Rust, or install the command on your `PATH`.
 
 Package-manager installation requires a [published release](https://github.com/massimodeluisa/socli/releases). If no release is listed, [build from source](#from-git). Homebrew uses the project tap until a Core formula is accepted.
 
 ## Run with npm or Bun
 
 ```sh
-npx socli
+npx soclish
 ```
 
 With Bun:
 
 ```sh
-bunx socli
+bunx soclish
 ```
 
-Pass arguments after the package name, for example `npx socli --demo` or `bunx socli login bluesky`. npm selects the native executable for your operating system and CPU. Use Node.js 22 or newer with npm. `bunx --bun socli` runs the launcher with Bun itself.
+Pass arguments after the package name, for example `npx soclish --demo` or `bunx soclish login bluesky`. The launcher selects the native executable for your operating system and CPU from the six binaries bundled in the package. Use Node.js 22 or newer with npm. `bunx --bun soclish` runs the launcher with Bun itself.
 
 ## Install the command
 
 ```sh
-npm install --global socli
+npm install --global soclish
 socli --version
 ```
 
-A global installation makes `socli` available directly, so the other documentation examples work without an `npx` or `bunx` prefix. Update it with `npm update --global socli`.
+A global installation makes `socli` available directly, so the other documentation examples work without an `npx` or `bunx` prefix. Update it with `npm update --global soclish`.
 
 ## Homebrew
 

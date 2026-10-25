@@ -4,6 +4,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Bundled all six native executables into the soclish npm package and published the browser library as @massimodeluisa/soclib.
+
 - Grouped Homebrew architectures under one block per operating system and removed a redundant version declaration.
 
 - Added tag-gated deployment to the existing Cloudflare site worker and made the hosting target explicit.

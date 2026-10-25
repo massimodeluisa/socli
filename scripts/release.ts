@@ -164,28 +164,18 @@ export async function nativeNpmPackages(assets: string, output: string) {
   if (process.env.NPM_CLI_PACKAGE_NAME) manifest.name = process.env.NPM_CLI_PACKAGE_NAME
   if (process.env.GITHUB_REPOSITORY) manifest.repository.url = `git+https://github.com/${process.env.GITHUB_REPOSITORY}.git`
   const platforms = {}
-  manifest.optionalDependencies = {}
-  for (const platform of npmPlatforms) {
-    const name = `${manifest.name}-${platform.key}`
-    const directory = join(output, platform.key)
-    await mkdir(join(directory, 'bin'), { recursive: true })
-    const archive = `socli-${version}-${platform.target}`
-    execFileSync('tar', ['-xzf', join(assets, `${archive}.tar.gz`), '-C', join(directory, 'bin'), '--strip-components=1', `${archive}/socli`])
-    const binary = join(directory, 'bin/socli')
-    await chmod(binary, 0o755)
-    const metadata = {
-      name, version, description: `socli native executable for ${platform.key}`,
-      license: manifest.license, homepage: manifest.homepage, repository: manifest.repository,
-      os: [platform.os], cpu: [platform.cpu], files: ['bin/socli', 'LICENSE', 'THIRD-PARTY-NOTICES.md'],
-      publishConfig: { access: 'public' },
-    }
-    await writeFile(join(directory, 'package.json'), `${JSON.stringify(metadata, null, 2)}\n`)
-    for (const file of ['LICENSE', 'THIRD-PARTY-NOTICES.md']) await copyFile(file, join(directory, file))
-    platforms[platform.key] = { package: name, sha256: await digest(binary) }
-    manifest.optionalDependencies[name] = version
-  }
+  delete manifest.optionalDependencies
   const wrapper = join(output, 'cli')
   await mkdir(join(wrapper, 'bin'), { recursive: true })
+  for (const platform of npmPlatforms) {
+    const directory = join(wrapper, 'native', platform.key)
+    await mkdir(directory, { recursive: true })
+    const archive = `socli-${version}-${platform.target}`
+    execFileSync('tar', ['-xzf', join(assets, `${archive}.tar.gz`), '-C', directory, '--strip-components=1', `${archive}/socli`])
+    const binary = join(directory, 'socli')
+    await chmod(binary, 0o755)
+    platforms[platform.key] = { path: `native/${platform.key}/socli`, sha256: await digest(binary) }
+  }
   await writeFile(join(wrapper, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
   await writeFile(join(wrapper, 'platforms.json'), `${JSON.stringify(platforms, null, 2)}\n`)
   await copyFile('packages/cli/bin/socli.js', join(wrapper, 'bin/socli.js'))

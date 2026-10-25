@@ -47,15 +47,15 @@ The sample was captured with `socli --demo --print --no-prompt --width 100 --no-
 Run a published version without building Rust:
 
 ```sh
-npx socli
+npx soclish
 ```
 
-Or use `bunx socli`. Use Node.js 22 or newer with npm, or `bunx --bun socli` to run the launcher with Bun itself.
+Or use `bunx soclish`. Use Node.js 22 or newer with npm, or `bunx --bun soclish` to run the launcher with Bun itself.
 
 To keep the command on your `PATH`:
 
 ```sh
-npm install --global socli
+npm install --global soclish
 socli --version
 ```
 

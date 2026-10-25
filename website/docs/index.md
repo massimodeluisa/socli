@@ -10,15 +10,15 @@ socli reads X, Bluesky, dev/null, Threads and Mastodon in one full-screen termin
 ## Install
 
 ```sh
-npx socli
+npx soclish
 ```
 
-Or run `bunx socli`. These commands require a [published release](https://github.com/massimodeluisa/socli/releases); if no release is listed, [build from source](install.html#from-git).
+Or run `bunx soclish`. These commands require a [published release](https://github.com/massimodeluisa/socli/releases); if no release is listed, [build from source](install.html#from-git).
 
 To use the bare `socli` commands in the examples below, install the command globally:
 
 ```sh
-npm install --global socli
+npm install --global soclish
 ```
 
 The [Install](install.html) page covers Homebrew availability, source builds, shell completions and icons.

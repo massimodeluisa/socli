@@ -1,5 +1,5 @@
 {
-  "name": "soclib",
+  "name": "@massimodeluisa/soclib",
   "version": "0.1.1",
   "description": "The socli browser reader and WebAssembly engine",
   "type": "module",
@@ -11,12 +11,25 @@
     "directory": "packages/web"
   },
   "exports": {
-    ".": { "types": "./index.d.ts", "default": "./index.js" },
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
     "./reader.worker.js": "./reader.worker.js",
     "./style.css": "./reader.css",
     "./socli.wasm": "./socli.wasm"
   },
-  "files": ["index.js", "index.d.ts", "reader.worker.js", "reader.css", "fonts", "socli.wasm", "README.md", "LICENSE", "THIRD-PARTY-NOTICES.md"],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "reader.worker.js",
+    "reader.css",
+    "fonts",
+    "socli.wasm",
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md"
+  ],
   "publishConfig": {
     "access": "public"
   }
