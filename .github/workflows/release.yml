@@ -145,7 +145,7 @@ jobs:
           "target/$TARGET/release/socli" --version | grep -Fx "socli $VERSION"
       - name: Package native build
         run: bash scripts/package-native.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.target }}
           path: artifacts/*
@@ -193,7 +193,7 @@ jobs:
           curl --fail --location --retry 3 "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz" --output "artifacts/socli-$VERSION-source.tar.gz"
           bun scripts/release.ts source-formula "$VERSION" "$GITHUB_REPOSITORY" "artifacts/socli-$VERSION-source.tar.gz" artifacts/socli-core.rb
           bun scripts/release.ts checksums artifacts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: distribution
           path: artifacts/*
