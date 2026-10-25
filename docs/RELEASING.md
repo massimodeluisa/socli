@@ -39,11 +39,15 @@ Complete these settings in the GitHub repository before pushing a release tag. T
 | `NPM_PACKAGE_NAME` | Actions variable, optional | Overrides the npm package name in `packages/web/package.json`. |
 | `NPM_CLI_PACKAGE_NAME` | Actions variable, optional | Overrides the launcher name in `packages/cli/package.json` and determines its six platform package names. |
 | `NPM_TOKEN` | Actions secret, optional | A granular publishing token for bootstrapping or when npm trusted publishing is unavailable. |
+| `SITE_DEPLOY_TARGET` | Actions variable | `cloudflare` for socli.sh; other values retain GitHub Pages deployment. |
+| `CLOUDFLARE_API_TOKEN` | Actions secret, required for Cloudflare | A deployment token scoped to the existing site worker account and socli.sh routes. |
 | `SITE_BASE` | Actions variable, optional | The website's deployment path; the default is `/`. |
 
 For npm, prefer [trusted publishing](https://docs.npmjs.com/trusted-publishers/). Configure each package's trusted publisher to use this GitHub repository and `release.yml`, and allow direct `npm publish`. There are eight packages: six native binaries, the CLI launcher, and soclib. The publishing job uses Node 24 and has `id-token: write`. Each generated package's repository URL comes from `GITHUB_REPOSITORY`, so it matches the publishing repository. If you cannot configure trusted publishing for the first publication, bootstrap with an `NPM_TOKEN` authorized for all eight package names, then configure trust for each package and remove the token.
 
-Set GitHub Pages to deploy through GitHub Actions. The `github-pages` environment must allow release tags. The workflow's `GITHUB_TOKEN` receives Contents write only in the GitHub release job; Pages and npm receive their own deployment permissions.
+The production site uses the existing `socli-site` Cloudflare Worker. Set `SITE_DEPLOY_TARGET=cloudflare` and provide `CLOUDFLARE_API_TOKEN`. The deployment extracts the checksummed website archive from the release and deploys the tagged worker source with pinned Wrangler. Keep the configured routes, including the longer Threads token routes, and do not replace them with a custom domain. A local Wrangler OAuth login does not supply a GitHub Actions credential.
+
+For a GitHub Pages destination, set GitHub Pages to deploy through GitHub Actions. The `github-pages` environment must allow release tags. The workflow's `GITHUB_TOKEN` receives Contents write only in the GitHub release job; Pages and npm receive their own deployment permissions.
 
 Protect `main` with CI checks and protect release tags with a tag ruleset. Use annotated tags, or signed tags when signing is configured. Treat a published tag as permanent: a correction gets a new version.
 
@@ -56,7 +60,7 @@ Protect `main` with CI checks and protect release tags with a tag ruleset. Use a
 5. Create an annotated `vX.Y.Z` tag on the prepared commit and push that tag to the GitHub publishing repository. Confirm the destination with `git remote -v`: a proxy remote is not evidence that GitHub received the push.
 6. Follow the Release workflow. Validation rejects malformed tags, version mismatches, missing release notes, and commits outside `main`'s history. A stable version must be newer than the published stable versions returned by GitHub. Tests run before the native and web builds.
 
-The workflow uses the Rust toolchain pinned by `rust-toolchain.toml`, locked Cargo dependencies, and the frozen website lockfile. It builds and runs `--version` for each native target, using `cross` to build Linux and QEMU user-mode emulation to run the ARM and 32-bit executables. Linux smoke tests also read the offline demo feed. Native builds and the web build must all succeed before the GitHub release becomes public. The npm job publishes the exact `.tgz` files already attached to the GitHub release. It publishes the platform packages before the launcher so the launcher's optional dependencies already exist. A configured Homebrew tap updates independently of npm. Pages deploys after npm succeeds and the tap update succeeds or is skipped.
+The workflow uses the Rust toolchain pinned by `rust-toolchain.toml`, locked Cargo dependencies, and the frozen website lockfile. It builds and runs `--version` for each native target, using `cross` to build Linux and QEMU user-mode emulation to run the ARM and 32-bit executables. Linux smoke tests also read the offline demo feed. Native builds and the web build must all succeed before the GitHub release becomes public. The npm job publishes the exact `.tgz` files already attached to the GitHub release. It publishes the platform packages before the launcher so the launcher's optional dependencies already exist. A configured Homebrew tap updates independently of npm. The selected website destination deploys after npm succeeds and the tap update succeeds or is skipped.
 
 The dated changelog section must describe the exact tagged source.
 
@@ -65,6 +69,8 @@ The dated changelog section must describe the exact tagged source.
 Prerelease tags use `vX.Y.Z-alpha.N`, `vX.Y.Z-beta.N`, or `vX.Y.Z-rc.N`, with the same version in the Cargo manifest, both npm manifests, and `Cargo.lock`. They create a GitHub prerelease and publish npm with the `next` tag. They do not change the Homebrew tap, stable website, or GitHub's latest-release selection. Stable tags publish npm with `latest` and update all stable destinations.
 
 Release runs share a concurrency group so publishing jobs from different versions do not interleave. External registries do not provide a transaction across GitHub, npm, Homebrew, and Pages. A failure after GitHub publication can therefore leave some destinations updated and others pending. Fix the external configuration and rerun the failed jobs in the existing workflow run. Rerunning all jobs for an already-published stable tag fails release-order validation. Do not move the tag or overwrite published binaries to repair a release.
+
+A workflow fix on `main` applies to future tags. Published tags retain their original workflow. If the tagged npm publisher itself has a bug, download and verify the existing release assets, then use the corrected publishing helper with those exact tarballs after signing in. Do not move the tag or regenerate the published packages.
 
 If npm fails partway through publishing, the retry checks every existing version's registry integrity against the local tarball. Identical packages are skipped; a version with different bytes stops the job. Authentication and registry errors also stop the job rather than being treated as missing packages.
 
