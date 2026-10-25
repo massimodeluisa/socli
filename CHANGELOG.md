@@ -8,6 +8,7 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 - Fixed cross installation by verifying its archive against a pinned SHA-256 instead of a nonexistent checksum file.
 - Added manual release-build verification without publication.
+- Included the brand-page assets in clean website builds.
 
 ## [0.1.0] - 2026-10-25
 
