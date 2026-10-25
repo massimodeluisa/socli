@@ -15,7 +15,7 @@ description: Cross-platform TUI social media client for X, Bluesky, dev/null, Th
 
 <InstallCommand />
 
-<p class="meta"><span>0.1.0</span> <a href="https://github.com/massimodeluisa/socli/blob/main/LICENSE">MIT</a> <span><code>socli --demo</code> needs no account</span></p>
+<p class="meta"><span>0.1.0</span> <a href="https://github.com/massimodeluisa/socli/blob/main/LICENSE">MIT</a> <span><code>npx socli --demo</code> needs no account</span></p>
 
 <nav class="nets" aria-label="Networks">
   <a href="docs/networks.html#x">X</a>

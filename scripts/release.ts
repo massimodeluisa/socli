@@ -75,6 +75,38 @@ ${blocks.join('\n\n')}
 
   test do
     assert_match version.to_s, shell_output("#{bin}/socli --version")
+    posts = JSON.parse(shell_output("#{bin}/socli feed --demo --json"))
+    assert posts.any? { |post| post.fetch("network") == "devnull" }
+  end
+end
+`
+}
+
+export async function homebrewSourceFormula(version: string, repository: string, archive: string): Promise<string> {
+  return `class Socli < Formula
+  desc "Thread-first terminal client for social networks"
+  homepage "https://socli.sh"
+  url "https://github.com/${repository}/archive/refs/tags/v${version}.tar.gz"
+  sha256 "${await digest(archive)}"
+  license "MIT"
+
+  depends_on "rust" => :build
+
+  on_macos do
+    depends_on xcode: ["13.0", :build]
+  end
+
+  def fetch
+    system "cargo", "fetch", *std_cargo_fetch_args
+  end
+
+  def install
+    system "cargo", "install", *std_cargo_args, "--bin", "socli"
+  end
+
+  test do
+    posts = JSON.parse(shell_output("#{bin}/socli feed --demo --json"))
+    assert posts.any? { |post| post.fetch("network") == "devnull" }
   end
 end
 `
@@ -172,6 +204,7 @@ if (import.meta.main) {
   else if (command === 'web' && args.length === 2) await webPackage(args[0], args[1])
   else if (command === 'npm-native' && args.length === 2) await nativeNpmPackages(args[0], args[1])
   else if (command === 'formula' && args.length === 3) await writeFile(join(args[2], 'socli.rb'), await homebrewFormula(args[0], args[1], args[2]))
+  else if (command === 'source-formula' && args.length === 4) await writeFile(args[3], await homebrewSourceFormula(args[0], args[1], args[2]))
   else if (command === 'checksums' && args.length === 1) await checksums(args[0])
-  else throw new Error('usage: release.ts validate TAG | web WASM OUT | npm-native ASSETS OUT | formula VERSION REPOSITORY ASSETS | checksums ASSETS')
+  else throw new Error('usage: release.ts validate TAG | web WASM OUT | npm-native ASSETS OUT | formula VERSION REPOSITORY ASSETS | source-formula VERSION REPOSITORY ARCHIVE OUT | checksums ASSETS')
 }

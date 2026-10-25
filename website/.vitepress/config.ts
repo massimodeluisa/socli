@@ -15,7 +15,7 @@ const base = (() => {
 const description =
   'Cross-platform TUI social media client for X, Bluesky, dev/null, Threads and Mastodon.'
 
-const installCommand = 'cargo install --git https://github.com/massimodeluisa/socli'
+const installCommand = 'npx socli'
 
 const readerHome = `${base}web/`
 const readerBare = `${base}web`
