@@ -4,6 +4,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Resolved npm tarball paths before publication so npm did not interpret them as GitHub repositories.
+
 ## [0.1.1] - 2026-10-25
 
 - Ran Linux smoke tests directly through QEMU so version and offline-feed arguments reached the executable.

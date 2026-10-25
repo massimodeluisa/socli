@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { resolve } from 'node:path'
 
 export async function npmPublishPlan(assets: string) {
   const packages = []
   for (const name of (await readdir(assets)).filter((name) => name.endsWith('.tgz'))) {
-    const path = join(assets, name)
+    const path = resolve(assets, name)
     const manifest = JSON.parse(execFileSync('tar', ['-xOf', path, 'package/package.json'], { encoding: 'utf8' }))
     packages.push({ path, manifest, integrity: `sha512-${createHash('sha512').update(await readFile(path)).digest('base64')}` })
   }
