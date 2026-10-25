@@ -54,6 +54,9 @@ test('Homebrew downloads the release archives and verifies their actual hashes',
   }
   const formula = await homebrewFormula('1.2.3', 'owner/project', assets)
   expect(formula.match(/sha256 /g)?.length).toBe(4)
+  expect(formula.match(/on_macos do/g)?.length).toBe(1)
+  expect(formula.match(/on_linux do/g)?.length).toBe(1)
+  expect(formula).not.toContain('  version "')
   expect(formula).toContain('https://github.com/owner/project/releases/download/v1.2.3/socli-1.2.3-x86_64-apple-darwin.tar.gz')
   expect(formula).toContain(createHash('sha256').update('aarch64-unknown-linux-musl').digest('hex'))
 })

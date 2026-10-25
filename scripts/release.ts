@@ -57,14 +57,16 @@ export async function homebrewFormula(version: string, repository: string, asset
     ['linux', 'arm', 'aarch64-unknown-linux-musl'],
     ['linux', 'intel', 'x86_64-unknown-linux-musl'],
   ]
-  const blocks = await Promise.all(platforms.map(async ([os, cpu, target]) => {
-    const name = archive(target)
-    return `  on_${os} do\n    on_${cpu} do\n      url "https://github.com/${repository}/releases/download/v${version}/${name}"\n      sha256 "${await digest(join(assets, name))}"\n    end\n  end`
+  const blocks = await Promise.all(['macos', 'linux'].map(async (os) => {
+    const architectures = await Promise.all(platforms.filter(([platform]) => platform === os).map(async ([, cpu, target]) => {
+      const name = archive(target)
+      return `    on_${cpu} do\n      url "https://github.com/${repository}/releases/download/v${version}/${name}"\n      sha256 "${await digest(join(assets, name))}"\n    end`
+    }))
+    return `  on_${os} do\n${architectures.join('\n\n')}\n  end`
   }))
   return `class Socli < Formula
   desc "Thread-first terminal client for social networks"
   homepage "https://socli.sh"
-  version "${version}"
   license "MIT"
 
 ${blocks.join('\n\n')}
