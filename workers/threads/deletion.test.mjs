@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { createHmac } from "node:crypto"
 import test from "node:test"
-import { handle, verifySignedRequest } from "./index.js"
+import { describeGraphFailure, handle, verifySignedRequest } from "./index.js"
 
 const SECRET = "test-secret"
 const USER = "218471"
@@ -73,6 +73,47 @@ test("delete matches deletion, and deauthorize confirms without keeping the user
   assert.equal(
     (await handle(post("/threads/deauthorize", new URLSearchParams({ signed_request: signed })), {})).status,
     500,
+  )
+})
+
+test("a probe body is just a sign-in with no code", async () => {
+  const response = await handle(
+    post("/threads/token", JSON.stringify({ probe: "app" }), {
+      "content-type": "application/json",
+    }),
+    { THREADS_APP_ID: "1", THREADS_APP_SECRET: SECRET },
+  )
+  assert.equal(response.status, 400)
+  const body = await response.json()
+  assert.equal(body.error, "this sign-in has expired. start it again.")
+  assert.equal(body.ok, undefined)
+})
+
+test("graph failures keep Meta's message and subcode", () => {
+  assert.equal(
+    describeGraphFailure({
+      error: { message: "Invalid verification code", type: "OAuthException", code: 1, error_subcode: 36006 },
+    }),
+    "Invalid verification code, code 1, subcode 36006",
+  )
+  assert.equal(
+    describeGraphFailure({
+      error_type: "OAuthException",
+      code: 400,
+      error_message: "Matching code was not found or was already used",
+    }),
+    "Matching code was not found or was already used, code 400",
+  )
+  assert.equal(
+    describeGraphFailure({
+      error: {
+        message: "Invalid parameter",
+        code: 100,
+        error_subcode: 36008,
+        error_user_msg: "redirect uri does not match",
+      },
+    }),
+    "redirect uri does not match, code 100, subcode 36008",
   )
 })
 

@@ -1,8 +1,9 @@
 /**
- * Trades a Threads authorization code for a long-lived user token.
+ * Trades a Threads authorization code for a user token.
  * The Threads app secret stays in the Worker secret THREADS_APP_SECRET.
  * THREADS_APP_ID is the Threads app id, not the Facebook app id.
  * Keep the redirect list in step with src/net/threads/auth.rs.
+ * A failed 60-day swap still returns the one-hour token. The code was already spent.
  *
  * POST /threads/deletion and POST /threads/delete answer Meta's data-deletion callback.
  * POST /threads/deauthorize answers the uninstall callback.
@@ -43,47 +44,44 @@ export async function handle(request, env) {
   if (request.method !== "POST" || path !== "/threads/token") {
     return json({ error: "not found" }, 404, origin)
   }
-    let body
-    try {
-      body = await request.json()
-    } catch {
-      return json({ error: "the body must be JSON" }, 400, origin)
-    }
-    const code = typeof body.code === "string" ? body.code.trim() : ""
-    const redirect = typeof body.redirect_uri === "string" ? body.redirect_uri : ""
-    if (!code || code.length > 512 || /\s/.test(code) || !REDIRECTS.has(redirect)) {
-      return json({ error: "this sign-in has expired. start it again." }, 400, origin)
-    }
-    const appId = env.THREADS_APP_ID || ""
-    const secret = env.THREADS_APP_SECRET || ""
-    if (!appId || !secret) {
-      return json({ error: "the Threads exchange is not configured" }, 500, origin)
-    }
-    const exchanged = await postForm("https://graph.threads.com/oauth/access_token", {
-      client_id: appId,
-      client_secret: secret,
-      grant_type: "authorization_code",
-      redirect_uri: redirect,
-      code,
-    })
-    if (!exchanged.ok) {
-      return json({ error: scrub(exchanged.error, secret) }, 502, origin)
-    }
-    const longLived = await getToken(
-      `https://graph.threads.com/access_token?grant_type=th_exchange_token&client_secret=${encodeURIComponent(secret)}&access_token=${encodeURIComponent(exchanged.access_token)}`,
-    )
-    if (!longLived.ok) {
-      return json({ error: scrub(longLived.error, secret) }, 502, origin)
-    }
-    return json(
-      {
-        access_token: longLived.access_token,
-        expires_in: longLived.expires_in,
-        user_id: exchanged.user_id,
-      },
-      200,
-      origin,
-    )
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: "the body must be JSON" }, 400, origin)
+  }
+  const code = typeof body.code === "string" ? body.code.trim() : ""
+  const redirect = typeof body.redirect_uri === "string" ? body.redirect_uri : ""
+  if (!code || code.length > 512 || /\s/.test(code) || !REDIRECTS.has(redirect)) {
+    return json({ error: "this sign-in has expired. start it again." }, 400, origin)
+  }
+  const appId = env.THREADS_APP_ID || ""
+  const secret = env.THREADS_APP_SECRET || ""
+  if (!appId || !secret) {
+    return json({ error: "the Threads exchange is not configured" }, 500, origin)
+  }
+  const exchanged = await postForm("https://graph.threads.com/oauth/access_token", {
+    client_id: appId,
+    client_secret: secret,
+    grant_type: "authorization_code",
+    redirect_uri: redirect,
+    code,
+  })
+  if (!exchanged.ok) {
+    const text = scrub(exchanged.error, secret, code)
+    return json({ error: text, error_message: text }, 502, origin)
+  }
+  const longLived = await longLivedToken(secret, exchanged.access_token)
+  const token = longLived.ok ? longLived : exchanged
+  return json(
+    {
+      access_token: token.access_token,
+      expires_in: seconds(token.expires_in, longLived.ok ? 60 * 86400 : 3600),
+      user_id: exchanged.user_id,
+    },
+    200,
+    origin,
+  )
 }
 
 async function deletion(request, env) {
@@ -205,9 +203,37 @@ function json(body, status, origin) {
   })
 }
 
-function scrub(text, secret) {
-  const clean = String(text || "Threads refused the code").split(secret).join("[secret]")
+function scrub(text, secret, token) {
+  let clean = String(text || "Threads refused the code")
+  if (secret) clean = clean.split(secret).join("[secret]")
+  if (token) clean = clean.split(token).join("[token]")
   return clean.slice(0, 300)
+}
+
+/** Meta's code, subcode, and message. Either error shape, nothing else. */
+export function describeGraphFailure(payload) {
+  const nested = payload && typeof payload.error === "object" && payload.error ? payload.error : null
+  const message =
+    text(payload?.error_message) ||
+    text(nested?.error_user_msg) ||
+    text(nested?.message) ||
+    text(payload?.error) ||
+    "Threads refused the code"
+  const code = nested?.code ?? payload?.code
+  const sub = nested?.error_subcode ?? payload?.error_subcode
+  const bits = [message]
+  if (code !== undefined && code !== null && code !== "") bits.push(`code ${code}`)
+  if (sub !== undefined && sub !== null && sub !== "") bits.push(`subcode ${sub}`)
+  return bits.join(", ")
+}
+
+function text(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : ""
+}
+
+function seconds(value, fallback) {
+  const n = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback
 }
 
 async function postForm(url, fields) {
@@ -220,24 +246,44 @@ async function postForm(url, fields) {
   return readToken(response)
 }
 
+async function longLivedToken(secret, token) {
+  let last = { ok: false, error: "Threads refused the code" }
+  for (const host of ["https://graph.threads.com/access_token", "https://graph.threads.net/access_token"]) {
+    const url = new URL(host)
+    url.searchParams.set("grant_type", "th_exchange_token")
+    url.searchParams.set("client_secret", secret)
+    url.searchParams.set("access_token", token)
+    last = await getToken(url)
+    if (last.ok) return last
+    last = { ...last, error: scrub(last.error, secret, token) }
+  }
+  return last
+}
+
 async function getToken(url) {
   return readToken(await fetch(url))
 }
 
 async function readToken(response) {
-  let payload
-  try {
-    payload = await response.json()
-  } catch {
-    return { ok: false, error: "Threads refused the code" }
+  const raw = await response.text()
+  let payload = null
+  if (raw) {
+    try {
+      payload = JSON.parse(raw)
+    } catch {
+      const params = new URLSearchParams(raw)
+      const token = params.get("access_token")
+      if (token) {
+        payload = {
+          access_token: token,
+          expires_in: params.get("expires_in"),
+          user_id: params.get("user_id"),
+        }
+      }
+    }
   }
-  if (!response.ok || typeof payload.access_token !== "string" || !payload.access_token) {
-    const message =
-      payload?.error_message ||
-      payload?.error?.message ||
-      payload?.error ||
-      "Threads refused the code"
-    return { ok: false, error: typeof message === "string" ? message : "Threads refused the code" }
+  if (!response.ok || !payload || typeof payload.access_token !== "string" || !payload.access_token) {
+    return { ok: false, error: payload ? describeGraphFailure(payload) : "Threads refused the code" }
   }
   return {
     ok: true,

@@ -1,6 +1,6 @@
 # Threads sign-in
 
-`socli login threads` opens Threads so you can approve SoCLI's app. The authorize redirect is `https://socli.sh/`, which is the callback saved on the Threads app. socli.sh sends the browser on to `http://127.0.0.1:8742/threads/callback`, then the terminal posts the code to `https://socli.sh/threads/token`. That exchange holds the Threads app secret and returns a 60-day user token. SoCLI checks the token against `GET /me` and stores it. The page uses its own address as the redirect. The full-screen reader uses `https://socli.sh/web/`.
+`socli login threads` opens Threads so you can approve SoCLI's app. The authorize redirect is `https://socli.sh/`, which is the callback saved on the Threads app. socli.sh sends the browser on to `http://127.0.0.1:8742/threads/callback`, then the terminal posts the code to `https://socli.sh/threads/token`. That exchange holds the Threads app secret and returns a 60-day user token, or the one-hour token when the 60-day swap fails. SoCLI checks the token against `GET /me` and stores it. The page uses its own address as the redirect. The full-screen reader uses `https://socli.sh/web/`.
 
 SoCLI's Threads app id is compiled in. Setting `SOCLI_THREADS_APP_ID` when SoCLI is compiled replaces it. An empty value makes the build say `this build has no SoCLI Threads app` and does not ask you to create an app. The app is published. Each permission is ready for testing. A public account that Meta has not cleared is told to submit for review or be a tester. Public-profile grants last 90 days, and a refresh extends them. A private profile has to approve again.
 
@@ -23,7 +23,7 @@ https://socli.sh/web/
 
 Meta rejects an `http://` redirect, including `http://127.0.0.1`. The worker allowlist also contains those local addresses and `https://web.socli.sh/web/`, which does not resolve. The uninstall callback is `https://socli.sh/threads/deauthorize`. The delete callback is `https://socli.sh/threads/delete`. `https://socli.sh/threads/deletion` answers the same delete request.
 
-The Worker source is `workers/threads/index.js`. `THREADS_APP_SECRET` is a Worker secret. The public app id is compiled into SoCLI. The script allowlists the redirects above, posts the code to `https://graph.threads.com/oauth/access_token`, swaps the short-lived token for a long-lived one, and returns `access_token`, `expires_in` and `user_id`. It does not return the secret. Deploy is manual.
+The Worker source is `workers/threads/index.js`. `THREADS_APP_SECRET` is a Worker secret. The public app id is compiled into SoCLI. The script allowlists the redirects above, posts the code to `https://graph.threads.com/oauth/access_token`, swaps the short-lived token for a long-lived one, and returns `access_token`, `expires_in` and `user_id`. A failed swap still returns the one-hour token. A failed code exchange returns Meta's message, code, and subcode. It does not return the secret. Deploy is manual.
 
 Reading needs `threads_basic`. Publishing also needs `threads_content_publish`. The default scope list is `threads_basic,threads_content_publish,threads_read_replies,threads_manage_replies,threads_manage_mentions,threads_keyword_search,threads_delete`. Meta's access-token page is [Get Access Tokens](https://developers.facebook.com/documentation/threads/get-started/get-access-tokens-and-permissions).
 
