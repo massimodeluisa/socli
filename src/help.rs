@@ -556,7 +556,7 @@ const MORE_FLAGS: &[Flag] = &[
     DRY_RUN,
     (
         "--no-prompt",
-        "Do not open the socli> prompt after printing",
+        "Do not open the SoCLI> prompt after printing",
     ),
     (
         "--count <n>",
@@ -643,7 +643,7 @@ pub fn help_lines(width: usize) -> Vec<StyledLine> {
         &mut canvas,
         &[
             blank,
-            &[(Kind::Bold, "socli"), (Kind::Fg, " "), (Kind::Dim, VERSION)],
+            &[(Kind::Bold, "SoCLI"), (Kind::Fg, " "), (Kind::Dim, VERSION)],
             &[(Kind::Dim, TAGLINE)],
             &[
                 (Kind::Bold, "Usage"),

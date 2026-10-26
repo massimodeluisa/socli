@@ -1,6 +1,6 @@
 # Reddit
 
-socli does not support Reddit. The owner decided to skip it for now, and no Reddit code exists in the repository: there is no provider under `src/net/`, no `[reddit]` section in `config.toml`, and no `reddit` value for `--net`. This page records why, what an integration would need, and which options were on the table, so the question can be reopened without redoing the research.
+SoCLI does not support Reddit. The owner decided to skip it for now, and no Reddit code exists in the repository: there is no provider under `src/net/`, no `[reddit]` section in `config.toml`, and no `reddit` value for `--net`. This page records why, what an integration would need, and which options were on the table, so the question can be reopened without redoing the research.
 
 Part of the [integration overview](../README.md).
 
@@ -16,7 +16,7 @@ Reddit's own pages that state the approval rule block scripted requests, so they
 
 ## What an integration would need
 
-Two routes exist, and they differ in what socli could offer:
+Two routes exist, and they differ in what SoCLI could offer:
 
 - An approved Data API app that uses OAuth with read and write scopes. This is the only route that supports posting, replying and a personal home feed, and it depends on Reddit approving the app.
 - A read-only mode over RSS. It needs no approval and no sign-in for public subreddits, and it can follow the private front-page feed through the link from `reddit.com/prefs/feeds`. It cannot write.

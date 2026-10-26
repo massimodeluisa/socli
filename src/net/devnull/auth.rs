@@ -48,8 +48,8 @@ pub fn login(device_name: Option<String>) -> Result<(), String> {
     let callback = if browser::native() {
         screens::present_login(
             Network::Devnull.title(),
-            &[("Device key", &key_detail), ("Approve in the browser", "socli will receive the result automatically")],
-            "A macOS browser sign-in window will open. Approve socli there, or cancel to return to the terminal.",
+            &[("Device key", &key_detail), ("Approve in the browser", "SoCLI will receive the result automatically")],
+            "A macOS browser sign-in window will open. Approve SoCLI there, or cancel to return to the terminal.",
             None,
         )?;
         let callback = browser::authorize(&url)?;
@@ -69,7 +69,7 @@ pub fn login(device_name: Option<String>) -> Result<(), String> {
         screens::present_login(
             Network::Devnull.title(),
             &[("Device key", &key_detail), ("Approve in the browser", "open the complete link below"), ("Paste the callback", "devnull://auth/callback?code=…")],
-            &format!("{url}\n\nApprove socli in the browser. If the browser cannot open devnull://, copy the full callback URL from its address bar or the approval request's Location response header. On macOS, run without SOCLI_AUTH_BROWSER=manual to receive the callback automatically."),
+            &format!("{url}\n\nApprove SoCLI in the browser. If the browser cannot open devnull://, copy the full callback URL from its address bar or the approval request's Location response header. On macOS, run without SOCLI_AUTH_BROWSER=manual to receive the callback automatically."),
             Some("Callback:"),
         )?;
         let _ = util::open_browser(url.as_str());
@@ -124,7 +124,7 @@ fn default_device_name() -> String {
     device_name(command, |key| std::env::var(key).ok())
 }
 
-/** `socli on <host>`: the `hostname` output, else `HOSTNAME`, else `COMPUTERNAME`, each cut at the first `.` (macOS answers `name.local`); `socli` when none is set. */
+/** `SoCLI on <host>`: the `hostname` output, else `HOSTNAME`, else `COMPUTERNAME`, each cut at the first `.` (macOS answers `name.local`); `SoCLI` when none is set. */
 fn device_name(command: Option<String>, env: impl Fn(&str) -> Option<String>) -> String {
     command
         .into_iter()
@@ -138,7 +138,7 @@ fn device_name(command: Option<String>, env: impl Fn(&str) -> Option<String>) ->
                 .to_string()
         })
         .find(|host| !host.is_empty())
-        .map_or_else(|| "socli".into(), |host| format!("socli on {host}"))
+        .map_or_else(|| "SoCLI".into(), |host| format!("SoCLI on {host}"))
 }
 
 /// The public key `--key` names: the `.pub` file itself, or the `.pub` next to a private key.
@@ -204,7 +204,7 @@ pub fn setup_ssh(key: Option<PathBuf>) -> Result<(), String> {
     )?;
     let line = picked.line.clone();
     config::update(|cfg| cfg.devnull.ssh_key = Some(line.clone()))?;
-    let mut aside = "socli posts and replies on dev/null with this key.".to_string();
+    let mut aside = "SoCLI posts and replies on dev/null with this key.".to_string();
     if let Some(public) = public {
         let id = picked.id.as_str();
         let in_agent = ssh::agent_keys()
@@ -273,13 +273,13 @@ mod tests {
         let none = |_: &str| None;
         assert_eq!(
             device_name(Some("mac.local\n".into()), none),
-            "socli on mac"
+            "SoCLI on mac"
         );
         let env = |key: &str| (key == "COMPUTERNAME").then(|| "WORKPC".to_string());
-        assert_eq!(device_name(Some("  \n".into()), env), "socli on WORKPC");
+        assert_eq!(device_name(Some("  \n".into()), env), "SoCLI on WORKPC");
         let both = |key: &str| Some(format!("{key}-box"));
-        assert_eq!(device_name(None, both), "socli on HOSTNAME-box");
-        assert_eq!(device_name(None, none), "socli");
+        assert_eq!(device_name(None, both), "SoCLI on HOSTNAME-box");
+        assert_eq!(device_name(None, none), "SoCLI");
     }
 
     #[test]

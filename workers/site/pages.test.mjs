@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import test from "node:test"
-import worker, { cliLoopback, fallbackHtml, readerAsset, readerAssetPath, relayTarget, useOrigin } from "./index.js"
+import worker, { badgeLoopback, cliLoopback, fallbackHtml, readerAsset, readerAssetPath, relayTarget, useOrigin } from "./index.js"
 import { escapeHtml, inline, pagesModule, renderMarkdown } from "./render.mjs"
 
 test("the bundled pages quote the policy and do not invent a company", () => {
@@ -80,6 +80,44 @@ test("a terminal oauth return bounces to the loopback, and a page visit does not
   const posted = await worker.fetch(new Request(`https://socli.sh/?code=abc&state=${xState}`, { method: "POST" }))
   assert.equal(posted.status, 405)
   assert.equal(posted.headers.get("location"), null)
+})
+
+test("a badge oauth return bounces to that private address, and a public one is dropped", async () => {
+  const nonce = "a".repeat(64)
+  const state = `xb.ac140a04.${nonce}`
+  const target = new URL(badgeLoopback(new URL(`https://socli.sh/?code=${encodeURIComponent("abc.def~_+/-")}&state=${state}`)))
+  assert.equal(`${target.origin}${target.pathname}`, "http://172.20.10.4:8080/x/callback")
+  assert.equal(target.searchParams.get("code"), "abc.def~_+/-")
+  assert.equal(target.searchParams.get("state"), state)
+  assert.equal(target.port, "8080")
+  assert.equal(cliLoopback(new URL(`https://socli.sh/?code=abc&state=${state}`)), null)
+
+  const ten = badgeLoopback(new URL(`https://socli.sh/?code=abc&state=xb.0a010203.${nonce}`))
+  assert.equal(new URL(ten).hostname, "10.1.2.3")
+  const lan = badgeLoopback(new URL(`https://socli.sh/?code=abc&state=xb.c0a80001.${nonce}`))
+  assert.equal(new URL(lan).hostname, "192.168.0.1")
+  const low = badgeLoopback(new URL(`https://socli.sh/?code=abc&state=xb.ac100001.${nonce}`))
+  assert.equal(new URL(low).hostname, "172.16.0.1")
+  const high = badgeLoopback(new URL(`https://socli.sh/?code=abc&state=xb.ac1fffff.${nonce}`))
+  assert.equal(new URL(high).hostname, "172.31.255.255")
+  const link = badgeLoopback(new URL(`https://socli.sh/?code=abc&state=xb.a9fe0101.${nonce}`))
+  assert.equal(new URL(link).hostname, "169.254.1.1")
+
+  for (const hex of ["08080808", "7f000001", "00000000", "ac0f0001", "ac200001", "64400001"]) {
+    assert.equal(badgeLoopback(new URL(`https://socli.sh/?code=abc&state=xb.${hex}.${nonce}`)), "drop")
+  }
+  assert.equal(badgeLoopback(new URL(`https://socli.sh/?state=${state}`)), "drop")
+  assert.equal(badgeLoopback(new URL(`https://socli.sh/?code=${"x".repeat(513)}&state=${state}`)), "drop")
+  assert.equal(badgeLoopback(new URL(`https://socli.sh/privacy?code=abc&state=${state}`)), null)
+  assert.equal(badgeLoopback(new URL(`https://socli.sh/?code=abc&state=x.${nonce}`)), null)
+
+  const bounced = await worker.fetch(new Request(`https://socli.sh/?code=abc&state=${state}`))
+  assert.equal(bounced.status, 302)
+  assert.equal(bounced.headers.get("cache-control"), "no-store")
+  assert.equal(new URL(bounced.headers.get("location")).hostname, "172.20.10.4")
+  const dropped = await worker.fetch(new Request(`https://socli.sh/?code=abc&state=xb.08080808.${nonce}`))
+  assert.equal(dropped.status, 302)
+  assert.equal(dropped.headers.get("location"), "https://socli.sh/")
 })
 
 test("the api.x.com relay target stays on that host and a loopback on / is unchanged", () => {
@@ -163,6 +201,10 @@ test("the reader is an asset and a terminal return still leaves the homepage", a
   const home = await worker.fetch(new Request(`https://socli.sh/?code=abc&state=${pageState}`), env)
   assert.equal(home.status, 200)
   assert.equal(home.headers.get("content-security-policy"), null)
+  assert.equal(
+    home.headers.get("strict-transport-security"),
+    "max-age=31536000; includeSubDomains",
+  )
   assert.equal(fetched, "/index.html")
 
   fetched = ""

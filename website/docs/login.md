@@ -1,6 +1,6 @@
 ---
 title: Sign in
-description: How to sign in to X, Bluesky, dev/null, Threads and Mastodon, and how to check the accounts socli uses.
+description: How to sign in to X, Bluesky, dev/null, Threads and Mastodon, and how to check the accounts SoCLI uses.
 ---
 
 # Sign in
@@ -9,7 +9,7 @@ Each network has its own sign-in command. `socli auth status` shows what is conf
 
 ## X
 
-`socli login x` imports the session already signed in inside Chrome, Brave, Edge, Arc or Chromium and stores the cookies in the `[x]` section of `config.toml`. On a terminal, socli asks which profile to use even when only one matches. `--browser` and `--profile` together skip that question when they match one session.
+`socli login x` imports the session already signed in inside Chrome, Brave, Edge, Arc or Chromium and stores the cookies in the `[x]` section of `config.toml`. On a terminal, SoCLI asks which profile to use even when only one matches. `--browser` and `--profile` together skip that question when they match one session.
 
 Importing that session imitates the x.com web client. The calls use the public web bearer `WEB_BEARER`, a fixed Chrome user agent `CHROME_UA`, and a computed `x-client-transaction-id`. X may treat those calls as automation, so the account is at risk. The path X sanctions is `socli login x --oauth`.
 
@@ -31,7 +31,7 @@ The environment variables are `X_AUTH_TOKEN`, `X_CT0`, `X_CLIENT_ID`, `X_CLIENT_
 
 ## Bluesky
 
-`socli login bluesky` asks for your handle and an app password created at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords). socli never asks for the account password.
+`socli login bluesky` asks for your handle and an app password created at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords). SoCLI never asks for the account password.
 
 | Flag | What it does |
 | --- | --- |
@@ -43,37 +43,37 @@ The handle comes from `--handle`, then `BLUESKY_HANDLE`, then a prompt. The app 
 
 ## dev/null
 
-`socli login devnull` creates a device key and opens browser approval. On macOS, the browser sign-in window returns the result to socli automatically. On other platforms, or with `SOCLI_AUTH_BROWSER=manual`, paste the `devnull://` callback address back into the terminal.
+`socli login devnull` creates a device key and opens browser approval. On macOS, the browser sign-in window returns the result to SoCLI automatically. On other platforms, or with `SOCLI_AUTH_BROWSER=manual`, paste the `devnull://` callback address back into the terminal.
 
 | Flag | What it does |
 | --- | --- |
 | `--device-name <name>` | The label the device shows in your dev/null settings. |
 
-The default device name is `socli on <short hostname>`, and names are limited to 100 characters. No variable selects a dev/null credential: socli reads `HOSTNAME` or `COMPUTERNAME` for the default device name, and `HOME` to find `~/.ssh`.
+The default device name is `SoCLI on <short hostname>`, and names are limited to 100 characters. No variable selects a dev/null credential: SoCLI reads `HOSTNAME` or `COMPUTERNAME` for the default device name, and `HOME` to find `~/.ssh`.
 
 `socli auth devnull ssh` picks the GitHub SSH key that signs your commits, which lets you post without an approved device. Use `--key <path>` to choose a key explicitly.
 
 ## Threads
 
-`socli login threads` opens Threads and asks you to approve socli. The terminal returns to `https://socli.sh/`, and socli.sh sends the browser on to `http://127.0.0.1:8742/threads/callback`. The code goes to `https://socli.sh/threads/token`, which returns a 60-day token. The app secret stays on that exchange. The full-screen reader returns to `https://socli.sh/web/`. Threads does not accept an `http://` redirect, so a reader on this machine cannot finish that approval. SoCLI's Threads app is compiled in. An empty `SOCLI_THREADS_APP_ID` at compile time is a build that says it has no app and does not ask you to create one. The Threads app is published.
+`socli login threads` opens Threads and asks you to approve SoCLI. The terminal returns to `https://socli.sh/`, and socli.sh sends the browser on to `http://127.0.0.1:8742/threads/callback`. The code goes to `https://socli.sh/threads/token`, which returns a 60-day token. The app secret stays on that exchange. The full-screen reader returns to `https://socli.sh/web/`. Threads does not accept an `http://` redirect, so a reader on this machine cannot finish that approval. SoCLI's Threads app is compiled in. An empty `SOCLI_THREADS_APP_ID` at compile time is a build that says it has no app and does not ask you to create one. The Threads app is published.
 
-`socli login threads --token <token>` still stores a token you already have. socli checks it against `GET /me`. With `--app-secret`, socli swaps it for a long-lived token and refreshes that token before it lapses. Without the secret, socli stores the token with no expiry and never refreshes it, so a short-lived token stops working after an hour.
+`socli login threads --token <token>` still stores a token you already have. SoCLI checks it against `GET /me`. With `--app-secret`, SoCLI swaps it for a long-lived token and refreshes that token before it lapses. Without the secret, SoCLI stores the token with no expiry and never refreshes it, so a short-lived token stops working after an hour.
 
 | Flag | What it does |
 | --- | --- |
-| `--token <token>` | A token you already have. Without it, and without `THREADS_ACCESS_TOKEN`, socli opens the Threads approval. |
-| `--app-secret <secret>` | Your own Meta app's secret, for a pasted token. With it socli swaps that token for a long-lived one. |
+| `--token <token>` | A token you already have. Without it, and without `THREADS_ACCESS_TOKEN`, SoCLI opens the Threads approval. |
+| `--app-secret <secret>` | Your own Meta app's secret, for a pasted token. With it SoCLI swaps that token for a long-lived one. |
 
-The environment variables are `THREADS_ACCESS_TOKEN` and `THREADS_APP_SECRET`. `SOCLI_THREADS_APP_ID` replaces the compiled SoCLI app id, and it is read when socli is compiled, not at run time. `socli auth threads oauth --app-id <id> --app-secret <secret> --redirect-uri <url>` is the personal-app flow and asks you to paste the address you land on. `--scopes <list>` overrides the requested scopes, and `socli auth threads refresh` refreshes a long-lived token.
+The environment variables are `THREADS_ACCESS_TOKEN` and `THREADS_APP_SECRET`. `SOCLI_THREADS_APP_ID` replaces the compiled SoCLI app id, and it is read when SoCLI is compiled, not at run time. `socli auth threads oauth --app-id <id> --app-secret <secret> --redirect-uri <url>` is the personal-app flow and asks you to paste the address you land on. `--scopes <list>` overrides the requested scopes, and `socli auth threads refresh` refreshes a long-lived token.
 
 ## Mastodon
 
-`socli login mastodon` asks for your server, registers socli as an app on it, opens the authorization page, and asks you to paste the code back. An empty answer keeps `mastodon.social`.
+`socli login mastodon` asks for your server, registers SoCLI as an app on it, opens the authorization page, and asks you to paste the code back. An empty answer keeps `mastodon.social`.
 
 | Flag | What it does |
 | --- | --- |
-| `--server <host>` | Your server, such as `fosstodon.org`. Without it socli reads `MASTODON_SERVER` or asks. |
-| `--token <token>` | An access token. With it socli never opens a browser. |
+| `--server <host>` | Your server, such as `fosstodon.org`. Without it SoCLI reads `MASTODON_SERVER` or asks. |
+| `--token <token>` | An access token. With it SoCLI never opens a browser. |
 
 The environment variables are `MASTODON_SERVER` and `MASTODON_ACCESS_TOKEN`. `socli login mastodon --token <token>` stores a token you created in Preferences > Development with the scopes `read write`, and it needs no browser.
 

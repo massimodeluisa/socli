@@ -205,7 +205,7 @@ fn login_frame_linked(
     let text_w = width.saturating_sub(column + 2).max(1);
     let mut canvas = Canvas::new(width);
     let y = canvas.push(false);
-    canvas.put(y, 2, Kind::Bold, "socli");
+    canvas.put(y, 2, Kind::Bold, "SoCLI");
     canvas.put(y, 7, Kind::Dim, " > login");
     canvas.push(false);
     if width >= 36 {
@@ -1684,7 +1684,7 @@ pub fn ask_welcome(handle: &str, loaded: &Loaded, width: usize) -> Vec<StyledLin
 
     let y = canvas.push(false);
     canvas.put(y, 0, Kind::Line, "╭─");
-    let x = canvas.put(y, 3, Kind::Dim, &format!("socli {VERSION}"));
+    let x = canvas.put(y, 3, Kind::Dim, &format!("SoCLI {VERSION}"));
     let fill = div.saturating_sub(x + 1);
     canvas.put(y, x + 1, Kind::Line, &"─".repeat(fill));
     canvas.put(y, div, Kind::Line, "┬");

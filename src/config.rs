@@ -146,7 +146,7 @@ pub struct ThreadsConfig {
 pub struct MastodonConfig {
     /// The server's host name, such as `mastodon.social`.
     pub server: Option<String>,
-    /// The app socli registered on that server, reused by the next sign-in.
+    /// The app SoCLI registered on that server, reused by the next sign-in.
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
     pub access_token: Option<String>,

@@ -1,6 +1,6 @@
 # dev/null: mapping
 
-socli turns each dev/null commit into the network-neutral types in `src/model.rs`. The mapper is `src/net/devnull/map.rs`. Related pages: [overview](README.md), [auth](auth.md), [endpoints](endpoints.md), [testing](testing.md).
+SoCLI turns each dev/null commit into the network-neutral types in `src/model.rs`. The mapper is `src/net/devnull/map.rs`. Related pages: [overview](README.md), [auth](auth.md), [endpoints](endpoints.md), [testing](testing.md).
 
 ## Ids
 
@@ -8,7 +8,7 @@ A commit id is `devnull:<commit id>` and a user id is `devnull:<author.id>`. A b
 
 ## Fields
 
-| socli | dev/null source |
+| SoCLI | dev/null source |
 | --- | --- |
 | `Post.id` | `devnull:` plus `id` |
 | `Post.text` | `body` |
@@ -42,7 +42,7 @@ A commit with `deleted_at` set, or one that has no author, becomes a placeholder
 
 ### Quotes
 
-`quoted_commit` becomes the quoted post. When socli quotes, it uses the native quote (`quoted_commit_id`) only if the quoted post is on dev/null and the access is an approved device. Otherwise it appends the link after a blank line. An SSH-key login can post and reply but not quote.
+`quoted_commit` becomes the quoted post. When SoCLI quotes, it uses the native quote (`quoted_commit_id`) only if the quoted post is on dev/null and the access is an approved device. Otherwise it appends the link after a blank line. An SSH-key login can post and reply but not quote.
 
 ## Accepted URLs
 
@@ -50,7 +50,7 @@ A commit with `deleted_at` set, or one that has no author, becomes a placeholder
 
 ## Rich text
 
-dev/null commits are plain text, so socli sends no facets, mentions or tags. The `<b>`, `<strong>`, `<i>` and `<em>` conversion (nesting included) to Unicode sans-serif bold, italic and bold-italic letters applies to dev/null as it does everywhere (`src/rich.rs`), unless you pass `--raw`, which sends the text as typed. The converted letters are different characters from the plain ones: screen readers may spell them out and a search for the plain word does not match them.
+dev/null commits are plain text, so SoCLI sends no facets, mentions or tags. The `<b>`, `<strong>`, `<i>` and `<em>` conversion (nesting included) to Unicode sans-serif bold, italic and bold-italic letters applies to dev/null as it does everywhere (`src/rich.rs`), unless you pass `--raw`, which sends the text as typed. The converted letters are different characters from the plain ones: screen readers may spell them out and a search for the plain word does not match them.
 
 ## Length
 

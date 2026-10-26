@@ -111,7 +111,7 @@ pub(crate) fn find_sessions(
     profile: Option<&str>,
 ) -> Result<Vec<FoundSession>, String> {
     let home = std::env::var_os("HOME").ok_or_else(|| {
-        "no HOME set, so socli cannot find a browser profile. set X_AUTH_TOKEN and X_CT0, or run `socli login x --oauth`.".to_string()
+        "no HOME set, so SoCLI cannot find a browser profile. set X_AUTH_TOKEN and X_CT0, or run `socli login x --oauth`.".to_string()
     })?;
     let mut found = Vec::new();
     let mut blocked = None;

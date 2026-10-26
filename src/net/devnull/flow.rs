@@ -156,7 +156,7 @@ mod tests {
     fn the_authorize_url_carries_every_parameter() {
         let url = authorize_url(
             "SHA256:hPEdU4FVZ1lfjzbPyBhqTWG2qxUu3ZbCnD8mZw9t2Vk",
-            "socli on mac",
+            "SoCLI on mac",
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
             "af0ifjsldkj",
             APP_CALLBACK,
@@ -180,7 +180,7 @@ mod tests {
                     "fingerprint",
                     "SHA256:hPEdU4FVZ1lfjzbPyBhqTWG2qxUu3ZbCnD8mZw9t2Vk"
                 ),
-                ("device_name", "socli on mac"),
+                ("device_name", "SoCLI on mac"),
                 (
                     "code_challenge",
                     "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
@@ -311,7 +311,7 @@ mod tests {
         let public = ssh_key::PublicKey::from_openssh(include_str!("fixtures/ssh/ed25519.pub"))
             .map_err(|err| err.to_string())?;
         let fingerprint = public.fingerprint(ssh_key::HashAlg::Sha256).to_string();
-        let url = authorize_url(&fingerprint, "socli", "challenge", "state", APP_CALLBACK)?;
+        let url = authorize_url(&fingerprint, "SoCLI", "challenge", "state", APP_CALLBACK)?;
         let carried = url
             .query_pairs()
             .find(|(key, _)| key == "fingerprint")

@@ -239,9 +239,9 @@ pub fn repl(state: &mut State, clients: &mut Clients, opts: &PrintOpts) -> Resul
     let stdin = io::stdin();
     loop {
         emit(if opts.color {
-            "\x1b[1msocli>\x1b[0m "
+            "\x1b[1mSoCLI>\x1b[0m "
         } else {
-            "socli> "
+            "SoCLI> "
         });
         let mut line = String::new();
         let n = stdin.read_line(&mut line).map_err(|e| e.to_string())?;

@@ -4,7 +4,7 @@
 
 `socli login x --oauth` is the other path: OAuth 2.0 with PKCE against a developer app you create at console.x.com. Passing `--client-id` or `--client-secret` selects that path as well. Two paste-in alternatives exist for scripts and agents: a user token you already hold, and an app-only bearer token for public reads. `X_AUTH_TOKEN` and `X_CT0` supply a browser session without reading a cookie database.
 
-The page cannot read those cookies. It opens `https://x.com/i/oauth2/authorize` for SoCLI's public client, and the person approves it. Setting `SOCLI_X_CLIENT_ID` when socli is compiled replaces that client. An empty value makes the page say `this build has no socli X app` and does not ask the person to create one. That page session is the official API. For you is a search, and likes and follows can be refused. The callbacks registered for that public client are `https://socli.sh/`, `https://socli.sh/web/`, `http://127.0.0.1:5174/`, and `http://127.0.0.1:5174/web/`. The full-screen reader on socli.sh returns to `https://socli.sh/web/`. The terminal row "A different account on x.com" uses `https://socli.sh/`. socli.sh sends the browser on to `http://127.0.0.1:8741/callback`, which is only the local listener. A personal app passed with `--client-id` or `--port` still uses `http://127.0.0.1:<port>/callback`. The id is read when socli is compiled, not at run time.
+The page cannot read those cookies. It opens `https://x.com/i/oauth2/authorize` for SoCLI's public client, and the person approves it. Setting `SOCLI_X_CLIENT_ID` when SoCLI is compiled replaces that client. An empty value makes the page say `this build has no SoCLI X app` and does not ask the person to create one. That page session is the official API. For you is a search, and likes and follows can be refused. The callbacks registered for that public client are `https://socli.sh/`, `https://socli.sh/web/`, `http://127.0.0.1:5174/`, and `http://127.0.0.1:5174/web/`. The full-screen reader on socli.sh returns to `https://socli.sh/web/`. The terminal row "A different account on x.com" uses `https://socli.sh/`. socli.sh sends the browser on to `http://127.0.0.1:8741/callback`, which is only the local listener. A personal app passed with `--client-id` or `--port` still uses `http://127.0.0.1:<port>/callback`. The id is read when SoCLI is compiled, not at run time.
 
 Back to [X](README.md) or the [integration overview](../README.md). Related: [endpoints](endpoints.md), [mapping](mapping.md), [testing](testing.md).
 
@@ -17,7 +17,7 @@ socli login x
 socli login x --browser brave --profile "Profile 7"
 ```
 
-On a terminal, socli asks which profile to use even when only one matches. Pass `--browser` and `--profile` together to skip that question when they match one session. Without a terminal, one match is used as-is, and several matches still need those two flags. socli reads the cookies, asks the signed-in home page which account they belong to, and stores the cookies together with that account. A home page that does not name an account leaves the previous config file unchanged.
+On a terminal, SoCLI asks which profile to use even when only one matches. Pass `--browser` and `--profile` together to skip that question when they match one session. Without a terminal, one match is used as-is, and several matches still need those two flags. SoCLI reads the cookies, asks the signed-in home page which account they belong to, and stores the cookies together with that account. A home page that does not name an account leaves the previous config file unchanged.
 
 This browser session imitates x.com's web client. Requests go out with the public web bearer `WEB_BEARER`, the fixed Chrome user agent `CHROME_UA`, and a computed `x-client-transaction-id`. X may treat that as automation, and the account is at risk. `socli login x --oauth` is the path X sanctions.
 
@@ -30,7 +30,7 @@ This path does not use a developer app. The official API's For you feed, likes a
 
 ## Sign in with a developer app
 
-Create an app in the developer console (`console.x.com`) with OAuth 2.0 enabled and this callback URL, which socli listens on:
+Create an app in the developer console (`console.x.com`) with OAuth 2.0 enabled and this callback URL, which SoCLI listens on:
 
 ```
 http://127.0.0.1:8741/callback
@@ -54,7 +54,7 @@ socli auth x login --client-id <id>
 | `--scopes <list>` | The OAuth scopes to ask for. Default: `tweet.read tweet.write users.read bookmark.read bookmark.write offline.access`. |
 | `--port <n>` | The local callback port. Default `8741`. The callback URL in the developer console must use the same port. |
 
-With no `--client-id` and no stored client id, `--oauth` and "A different account on x.com" use SoCLI's compiled client. socli then does the following:
+With no `--client-id` and no stored client id, `--oauth` and "A different account on x.com" use SoCLI's compiled client. SoCLI then does the following:
 
 1. Builds the authorize URL on `https://x.com/i/oauth2/authorize` with `response_type=code`, the client id, the redirect URI, the scopes, a random `state` and the PKCE challenge, and opens it in the browser.
 2. Waits on `127.0.0.1:<port>` for the redirect (the read times out after 180 seconds), checks that `state` matches, and takes the `code`.
@@ -69,7 +69,7 @@ The scope `offline.access` is what makes X issue a refresh token. The official d
 socli auth x token --access-token <token> [--user-id <id>] [--username <name>] [--refresh-token <token>]
 ```
 
-This stores a user access token without any browser. `--user-id` and `--username` are optional but speed up later calls. Without `--refresh-token` (and a stored client id) socli cannot renew the token when X rejects it.
+This stores a user access token without any browser. `--user-id` and `--username` are optional but speed up later calls. Without `--refresh-token` (and a stored client id) SoCLI cannot renew the token when X rejects it.
 
 ## App-only bearer token
 
@@ -77,7 +77,7 @@ This stores a user access token without any browser. `--user-id` and `--username
 socli auth x bearer <token>
 ```
 
-The bearer token is for public reads: search, threads, profiles, counts and views. It cannot post, like, repost, bookmark or follow. When a browser session or a user token is stored, socli prefers the browser session for every call and otherwise uses the user token. With only a bearer, it uses that for reads and refuses writes with "sign in first: `socli login x`".
+The bearer token is for public reads: search, threads, profiles, counts and views. It cannot post, like, repost, bookmark or follow. When a browser session or a user token is stored, SoCLI prefers the browser session for every call and otherwise uses the user token. With only a bearer, it uses that for reads and refuses writes with "sign in first: `socli login x`".
 
 ## What is stored
 
@@ -115,7 +115,7 @@ A client exists as soon as both cookie variables are set, or `X_ACCESS_TOKEN` or
 
 A browser session has no refresh call. When X rejects the cookies, run `socli login x` again.
 
-When the official API answers 401 and a refresh token is stored, socli refreshes once and retries the call. The refresh is `POST https://api.x.com/2/oauth2/token` with `grant_type=refresh_token`, the refresh token and the client id (basic authentication when a client secret exists). It needs a stored client id and refresh token. The new tokens are saved to `config.toml`. Without a stored client id the refresh stops with "no client id stored; cannot refresh. run `socli login x`", and a refresh that X rejects is reported as "refresh failed (<status>)" followed by X's answer. A 401 with no refresh token stored is reported as "The token was rejected. Run `socli login x`, or check X_ACCESS_TOKEN / X_BEARER_TOKEN."
+When the official API answers 401 and a refresh token is stored, SoCLI refreshes once and retries the call. The refresh is `POST https://api.x.com/2/oauth2/token` with `grant_type=refresh_token`, the refresh token and the client id (basic authentication when a client secret exists). It needs a stored client id and refresh token. The new tokens are saved to `config.toml`. Without a stored client id the refresh stops with "no client id stored; cannot refresh. run `socli login x`", and a refresh that X rejects is reported as "refresh failed (<status>)" followed by X's answer. A 401 with no refresh token stored is reported as "The token was rejected. Run `socli login x`, or check X_ACCESS_TOKEN / X_BEARER_TOKEN."
 
 ## Status and sign-out
 
@@ -129,4 +129,4 @@ socli auth x logout
 
 ## Agents and scripts
 
-`socli login x` and `socli auth x login` need a person, so they refuse to run when agent mode is active (`SOCLI_AGENT=1`, or socli recognizes an agent from its environment variables; `SOCLI_AGENT=0` turns the mode off). The refusal is a usage error with exit code 2: "signing in to X needs a person at a browser. Run socli login x in a terminal". Any other prompt refuses the same way when nobody can answer it (stdin and stderr must both be terminals and agent mode must be off), with exit code 2 and a message that starts "this step needs a person at a terminal.". After a person has signed in, an agent reuses the stored cookies or token. Without a person, `X_AUTH_TOKEN` and `X_CT0`, or `socli auth x token` and `socli auth x bearer`, provide credentials. JSON output of a sign-in command has the form `{"ok": true, "network": "x", ...}`; `auth` subcommands print `{"ok": true, "network": "x", "action": "token"}` and similar.
+`socli login x` and `socli auth x login` need a person, so they refuse to run when agent mode is active (`SOCLI_AGENT=1`, or SoCLI recognizes an agent from its environment variables; `SOCLI_AGENT=0` turns the mode off). The refusal is a usage error with exit code 2: "signing in to X needs a person at a browser. Run socli login x in a terminal". Any other prompt refuses the same way when nobody can answer it (stdin and stderr must both be terminals and agent mode must be off), with exit code 2 and a message that starts "this step needs a person at a terminal.". After a person has signed in, an agent reuses the stored cookies or token. Without a person, `X_AUTH_TOKEN` and `X_CT0`, or `socli auth x token` and `socli auth x bearer`, provide credentials. JSON output of a sign-in command has the form `{"ok": true, "network": "x", ...}`; `auth` subcommands print `{"ok": true, "network": "x", "action": "token"}` and similar.

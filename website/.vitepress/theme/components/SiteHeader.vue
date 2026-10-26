@@ -42,9 +42,9 @@ onBeforeUnmount(() => {
 
 <template>
   <header ref="header">
-    <a class="brand" :href="withBase('/')" aria-label="socli home">
-      <img class="mark" :src="markSrc" width="22" height="22" alt="" />
-      <span>socli</span>
+    <a class="brand" :href="withBase('/')" aria-label="SoCLI home">
+      <img class="mark" :src="markSrc" width="22" height="22" alt="So_" />
+      <span>SoCLI</span>
     </a>
     <nav aria-label="Site">
       <a

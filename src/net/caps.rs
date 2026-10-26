@@ -8,7 +8,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use super::{Caps, FeedKind, NetError};
 
 pub const NO_TRENDING: &str =
-    "X has no trending feed in socli yet. Try `socli search <words> --net x`";
+    "X has no trending feed in SoCLI yet. Try `socli search <words> --net x`";
 
 pub const MASTODON_DEFAULT_SERVER: &str = "mastodon.social";
 const MASTODON_DEFAULT_MAX: usize = 500;

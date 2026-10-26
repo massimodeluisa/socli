@@ -38,7 +38,7 @@ pub fn prepare() -> Result<Prepared, String> {
     let state = pkce::code_verifier();
     let url = authorize_url(
         &fingerprint,
-        "socli on this page",
+        "SoCLI on this page",
         &challenge,
         &state,
         flow::APP_CALLBACK,

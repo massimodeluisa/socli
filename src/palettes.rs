@@ -1,7 +1,7 @@
 /*!
 Named themes. The palettes are adapted from the TUI themes of opencode (https://github.com/sst/opencode,
 MIT License, Copyright (c) 2025 opencode), which follow their upstream color schemes, and mapped onto
-socli's palette roles: the selected row and the rules are mixed from each theme's background and text,
+SoCLI's palette roles: the selected row and the rules are mixed from each theme's background and text,
 and every accent keeps at least 3:1 contrast with the background.
 */
 

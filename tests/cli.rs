@@ -97,18 +97,18 @@ fn print_lays_a_narrow_width_out_at_the_minimum_and_draws_to_the_edge() {
         let widest = text.lines().map(|line| line.chars().count()).max().unwrap();
         assert!(widest <= shown, "{asked}: {widest}\n{text}");
         assert!(
-            text.lines().any(|line| line.starts_with("socli")),
+            text.lines().any(|line| line.starts_with("SoCLI")),
             "{asked}\n{text}"
         );
     }
     let wide = demo_print("60", &["--detail", "rich"]);
     assert!(
-        wide.lines().any(|line| line.starts_with("  socli")),
+        wide.lines().any(|line| line.starts_with("  SoCLI")),
         "{wide}"
     );
     let medium = demo_print("104", &["--detail", "medium"]);
     let lines: Vec<&str> = medium.lines().collect();
-    assert!(lines[0].starts_with("socli › all › home"), "{medium}");
+    assert!(lines[0].starts_with("SoCLI › all › home"), "{medium}");
     assert!(lines[0].ends_with("Accounts   ⚑ 2"), "{medium}");
     assert!(
         lines.get(2).is_some_and(|line| line.starts_with("[All]")),
@@ -124,7 +124,7 @@ fn print_lays_a_narrow_width_out_at_the_minimum_and_draws_to_the_edge() {
 #[test]
 fn demo_print_merges_every_network() {
     let text = demo_print("72", &[]);
-    assert!(text.contains("socli › all › home"), "{text}");
+    assert!(text.contains("SoCLI › all › home"), "{text}");
     assert!(text.contains("@mina"));
     assert!(text.contains("@nuno"));
     assert!(text.contains("Show 2 more replies"), "{text}");
@@ -139,7 +139,7 @@ fn demo_print_merges_every_network() {
 fn demo_print_draws_medium_chrome_to_the_edge() {
     let text = demo_print("104", &["--detail", "medium"]);
     let lines: Vec<&str> = text.lines().collect();
-    assert!(lines[0].starts_with("socli › all › home"), "{text}");
+    assert!(lines[0].starts_with("SoCLI › all › home"), "{text}");
     assert!(lines[0].ends_with("Accounts   ⚑ 2"), "{text}");
     assert!(lines[1].is_empty());
     assert_eq!(
@@ -157,12 +157,12 @@ fn demo_print_draws_medium_chrome_to_the_edge() {
     assert!(text.contains("├╌╌╌╌╌╎"), "{text}");
     assert!(text.contains("╰╌╌╌╌╌╎"), "{text}");
     assert!(
-        text.contains("│ socli A thread-first terminal client for X, Bluesky"),
+        text.contains("│ SoCLI A thread-first terminal client for X, Bluesky"),
         "{text}"
     );
     assert!(text.contains("○ Show this thread"), "{text}");
     assert!(
-        text.contains("socli› [Home]  Notifications 2  Search"),
+        text.contains("SoCLI› [Home]  Notifications 2  Search"),
         "{text}"
     );
     assert!(text.contains("j/k move  ⏎ open"), "{text}");
@@ -174,7 +174,7 @@ fn an_unset_detail_follows_the_opening_client() {
     assert!(
         rich.lines()
             .next()
-            .is_some_and(|line| line.starts_with("  socli")),
+            .is_some_and(|line| line.starts_with("  SoCLI")),
         "{rich}"
     );
     assert!(!rich.is_ascii(), "{rich}");
@@ -225,7 +225,7 @@ fn an_unset_detail_follows_the_opening_client() {
     assert!(
         kept.lines()
             .next()
-            .is_some_and(|line| line.starts_with("socli ›")),
+            .is_some_and(|line| line.starts_with("SoCLI ›")),
         "{kept}"
     );
 
@@ -243,7 +243,7 @@ fn an_unset_detail_follows_the_opening_client() {
         saved
             .lines()
             .next()
-            .is_some_and(|line| line.starts_with("  socli")),
+            .is_some_and(|line| line.starts_with("  SoCLI")),
         "{saved}"
     );
 }
@@ -267,7 +267,7 @@ fn one_network_scope_shows_its_tabs_and_no_tags() {
     let text = demo_print("104", &["--detail", "rich", "--net", "bluesky"]);
     let lines: Vec<&str> = text.lines().collect();
     assert!(
-        lines[0].starts_with("  socli › bluesky › following"),
+        lines[0].starts_with("  SoCLI › bluesky › following"),
         "{text}"
     );
     assert_eq!(
@@ -294,14 +294,14 @@ fn one_network_scope_shows_its_tabs_and_no_tags() {
         ])
         .output()
         .unwrap();
-    assert!(stdout_of(out).starts_with("  socli › bluesky › following"));
+    assert!(stdout_of(out).starts_with("  SoCLI › bluesky › following"));
 }
 
 #[test]
 fn a_network_list_merges_only_those_networks() {
     let text = demo_print("104", &["--detail", "rich", "--net", "x,bluesky"]);
     let lines: Vec<&str> = text.lines().collect();
-    assert!(lines[0].starts_with("  socli › all › home"), "{text}");
+    assert!(lines[0].starts_with("  SoCLI › all › home"), "{text}");
     assert_eq!(
         lines[2],
         "  All  ● X  ● Bluesky  ○ dev/null  ○ Threads  ○ Mastodon                    │  [Home]  Discover  Saved"
@@ -366,7 +366,7 @@ fn demo_writes_target_the_pinned_post() {
 
 #[test]
 fn x_has_no_trending_feed() {
-    let message = "X has no trending feed in socli yet. Try `socli search <words> --net x`";
+    let message = "X has no trending feed in SoCLI yet. Try `socli search <words> --net x`";
     for (format, stderr) in [
         ("--print", format!("socli: {message}\n")),
         (
@@ -427,7 +427,7 @@ fn closing_the_pipe_after_one_line_exits_quietly() {
     BufReader::new(child.stdout.take().unwrap())
         .read_line(&mut first)
         .unwrap();
-    assert!(first.contains("socli › all"), "{first}");
+    assert!(first.contains("SoCLI › all"), "{first}");
     let out = child.wait_with_output().unwrap();
     assert_eq!(out.status.code(), Some(0));
     assert_eq!(String::from_utf8_lossy(&out.stderr), "");
@@ -517,7 +517,7 @@ fn nerd_icons_when_asked() {
 #[test]
 fn help_lists_commands_and_flags() {
     let text = stdout_of(socli().arg("--help").output().unwrap());
-    let version = concat!("socli ", env!("CARGO_PKG_VERSION"));
+    let version = concat!("SoCLI ", env!("CARGO_PKG_VERSION"));
     assert!(text.contains(version), "{text}");
     assert!(
         text.contains("X, Bluesky, dev/null, Threads and Mastodon in your terminal"),
@@ -956,7 +956,7 @@ fn share_only_prints_the_link_for_an_agent() {
 #[test]
 fn images_alone_is_auto_and_leaves_the_command() {
     let text = demo_print("104", &["--images", "feed"]);
-    assert!(text.contains("socli › all"), "{text}");
+    assert!(text.contains("SoCLI › all"), "{text}");
     assert!(text.contains("▣ "), "images printed: {text}");
     let out = socli()
         .args(["--demo", "--print", "--no-prompt", "--images", "blocks"])
@@ -1049,7 +1049,7 @@ fn agents_get_json_and_never_wait_for_a_key() {
             .unwrap(),
     );
     assert!(
-        text.contains("socli › all › home"),
+        text.contains("SoCLI › all › home"),
         "SOCLI_AGENT=0 keeps text: {text}"
     );
     let text = stdout_of(
@@ -1060,7 +1060,7 @@ fn agents_get_json_and_never_wait_for_a_key() {
             .unwrap(),
     );
     assert!(
-        text.contains("socli › all › home"),
+        text.contains("SoCLI › all › home"),
         "--print asks for text: {text}"
     );
 }
@@ -1458,7 +1458,7 @@ fn view_rejects_a_target_it_cannot_load_in_json_too() {
 fn printed_profiles_skip_the_search_bar_and_the_back_key() {
     let text = demo_print("100", &["--detail", "rich", "user", "@mina", "--net", "x"]);
     let lines: Vec<&str> = text.lines().collect();
-    assert!(lines[0].starts_with("  socli › x › @mina"), "{text}");
+    assert!(lines[0].starts_with("  SoCLI › x › @mina"), "{text}");
     assert!(!lines[0].contains("back"), "{text}");
     assert!(lines[1].is_empty(), "{text}");
     assert!(lines[2].contains("╭─ Profile "), "{text}");
@@ -1473,7 +1473,7 @@ fn printed_threads_never_offer_the_back_key() {
     let text = demo_print("100", &["--detail", "rich", "thread", "x:p1"]);
     let first = text.lines().next().unwrap();
     assert!(
-        first.starts_with("  socli › all › home › thread"),
+        first.starts_with("  SoCLI › all › home › thread"),
         "{first}"
     );
     assert!(!first.contains("back"), "{first}");

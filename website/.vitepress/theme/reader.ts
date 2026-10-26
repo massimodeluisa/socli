@@ -124,7 +124,7 @@ const POSTS: Record<string, Post> = {
     {
       link: {
         host: 'example.com/socli',
-        title: 'socli',
+        title: 'SoCLI',
         description:
           'A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon',
       },
@@ -502,7 +502,7 @@ export function mountReader(root: HTMLElement): () => void {
     const add = (text: string, cls: string) => {
       col += put(row, col, text, cls)
     }
-    add('socli›', 'b')
+    add('SoCLI›', 'b')
     const items = ['Home', 'Notifications', 'Search']
     for (const item of items) {
       add('  ', '')
@@ -779,7 +779,7 @@ export function mountReader(root: HTMLElement): () => void {
     let head: FeedRow[]
     let foot: FeedRow[]
     if (state.view === 'help') {
-      head = [header([['socli', 'b'], [' › ', 'dim'], ['keys', '']])]
+      head = [header([['SoCLI', 'b'], [' › ', 'dim'], ['keys', '']])]
       body = helpRows()
       foot = [hints([['any key', 'close']])]
     } else if (state.view === 'thread') {
@@ -790,7 +790,7 @@ export function mountReader(root: HTMLElement): () => void {
       head = [
         header(
           [
-            ['socli', 'b'],
+            ['SoCLI', 'b'],
             [' › ', 'dim'],
             [NET[root.net].label, NET[root.net].cls],
             [' › ', 'dim'],
@@ -816,7 +816,7 @@ export function mountReader(root: HTMLElement): () => void {
       head = [
         header(
           [
-            ['socli', 'b'],
+            ['SoCLI', 'b'],
             [' › ', 'dim'],
             ['all', ''],
             [' › ', 'dim'],
@@ -852,7 +852,7 @@ export function mountReader(root: HTMLElement): () => void {
     if (id) {
       const item = byId(id)
       const pin = state.view + ':' + id
-      screen.setAttribute('aria-label', 'socli demo. ' + item.name + ' selected.')
+      screen.setAttribute('aria-label', 'SoCLI demo. ' + item.name + ' selected.')
       if (pin !== state.pinned) {
         state.pinned = pin
         const el = feed.querySelector<HTMLElement>('[data-id="' + id + '"]')

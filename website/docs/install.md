@@ -1,11 +1,11 @@
 ---
 title: Install
-description: Run socli with npx or bunx, install the native command, or build it from source.
+description: Run SoCLI with npx or bunx, install the native command, or build it from source.
 ---
 
 # Install
 
-socli runs as a native terminal binary. Use `npx soclish` or `bunx soclish` to run a published version without building Rust, or install the command on your `PATH`.
+SoCLI runs as a native terminal binary. Use `npx soclish` or `bunx soclish` to run a published version without building Rust, or install the command on your `PATH`.
 
 Package-manager installation requires a [published release](https://github.com/massimodeluisa/socli/releases). If no release is listed, [build from source](#from-git). Homebrew uses the project tap until a Core formula is accepted.
 
@@ -44,7 +44,7 @@ socli --demo
 
 You can also install in one command with `brew install massimodeluisa/tap/socli`. Update the installed version with `brew update` followed by `brew upgrade socli`.
 
-A fresh Homebrew installation needs the tap because socli is not in Homebrew Core. Core acceptance requires a stable release and evidence of public use. The [Homebrew acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy) normally excludes repositories under 30 days old and applies higher popularity thresholds to self-submissions. Each socli release includes a source formula for a future Core submission.
+A fresh Homebrew installation needs the tap because SoCLI is not in Homebrew Core. Core acceptance requires a stable release and evidence of public use. The [Homebrew acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy) normally excludes repositories under 30 days old and applies higher popularity thresholds to self-submissions. Each SoCLI release includes a source formula for a future Core submission.
 
 ## From git
 
@@ -76,7 +76,7 @@ The argument is a shell name: `bash`, `zsh`, `fish`, `elvish` or `powershell`.
 
 ## Icons
 
-With the default `auto` icon mode, socli selects Nerd Font glyphs in Ghostty and WezTerm and Unicode icons in other terminals. To use Nerd Font glyphs, activate a Nerd Font in your terminal and choose `--icons nerd`. You can install one from [nerdfonts.com](https://www.nerdfonts.com/font-downloads).
+With the default `auto` icon mode, SoCLI selects Nerd Font glyphs in Ghostty and WezTerm and Unicode icons in other terminals. To use Nerd Font glyphs, activate a Nerd Font in your terminal and choose `--icons nerd`. You can install one from [nerdfonts.com](https://www.nerdfonts.com/font-downloads).
 
 `--no-icons` switches to Unicode icons that need no special font, and `NO_ICONS` in the environment does the same. `--icons auto|nerd|unicode` picks a set.
 

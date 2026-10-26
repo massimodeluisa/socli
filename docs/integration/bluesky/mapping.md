@@ -1,14 +1,14 @@
 # Bluesky: mapping
 
-socli turns each Bluesky view object into the network-neutral types in `src/model.rs` (`Post`, `User`, `Metrics`, link card, `Media`, quoted post). The mapper is `src/net/bluesky/map.rs`, rich text is `src/net/bluesky/facets.rs`. Related pages: [overview](README.md), [auth](auth.md), [endpoints](endpoints.md), [testing](testing.md).
+SoCLI turns each Bluesky view object into the network-neutral types in `src/model.rs` (`Post`, `User`, `Metrics`, link card, `Media`, quoted post). The mapper is `src/net/bluesky/map.rs`, rich text is `src/net/bluesky/facets.rs`. Related pages: [overview](README.md), [auth](auth.md), [endpoints](endpoints.md), [testing](testing.md).
 
 ## Ids
 
-A socli id is `<slug>:<native>`. For Bluesky the native part is the AT URI of the post, so a post id looks like `bluesky:at://did:plc:abc/app.bsky.feed.post/3m`. A user id is `bluesky:<did>`. A bare id with `--net bluesky` is scoped to Bluesky. An id that belongs to another network is refused with `<id> belongs to <network>, not Bluesky` (for example `x:p1 belongs to X, not Bluesky`). `Network` accepts `bluesky` and `bsky` as names.
+A SoCLI id is `<slug>:<native>`. For Bluesky the native part is the AT URI of the post, so a post id looks like `bluesky:at://did:plc:abc/app.bsky.feed.post/3m`. A user id is `bluesky:<did>`. A bare id with `--net bluesky` is scoped to Bluesky. An id that belongs to another network is refused with `<id> belongs to <network>, not Bluesky` (for example `x:p1 belongs to X, not Bluesky`). `Network` accepts `bluesky` and `bsky` as names.
 
 ## Fields
 
-| socli | Bluesky source |
+| SoCLI | Bluesky source |
 | --- | --- |
 | `Post.id` | `bluesky:` plus the post `uri` |
 | `Post.cid` | post `cid` (only Bluesky fills it; replies, quotes and bookmarks need it) |
@@ -48,13 +48,13 @@ Feed pages also include the root and parent of replies as context posts. A threa
 | A scoped id | used as is |
 | `https://bsky.app/profile/<actor>/post/<rkey>` (host may be `www.` or `mobile.` prefixed) | `bluesky:at://<actor>/app.bsky.feed.post/<rkey>`; a handle in `<actor>` is resolved to a DID before the call |
 | A bare id with `--net bluesky` | the scoped id |
-| Any other `bsky.app` path | error: `socli cannot read <input>. use a post id, or a link from x.com, bsky.app or dev-null.sh` |
+| Any other `bsky.app` path | error: `SoCLI cannot read <input>. use a post id, or a link from x.com, bsky.app or dev-null.sh` |
 
 Profile links are built by `Network::profile_url` as `https://bsky.app/profile/{handle}`, with a leading `@` dropped.
 
 ## Rich text
 
-When socli posts, it builds facets from the text. Offsets are UTF-8 byte offsets, as the record format requires.
+When SoCLI posts, it builds facets from the text. Offsets are UTF-8 byte offsets, as the record format requires.
 
 | Facet | Rule |
 | --- | --- |
@@ -62,11 +62,11 @@ When socli posts, it builds facets from the text. Offsets are UTF-8 byte offsets
 | Link (`app.bsky.richtext.facet#link`) | `http://` or `https://` URLs, not directly after an alphanumeric character. Trailing `. , ; : ! ? ) ] ' "` are trimmed. |
 | Tag (`app.bsky.richtext.facet#tag`) | `#tag` at a word start, at most 64 graphemes, not all digits, ending at whitespace or punctuation other than `_`. |
 
-A reply record carries `root` (the parent's own root when the parent is itself a reply, otherwise the parent) and `parent`. A quote is an `app.bsky.embed.record` embed with the quoted post's `uri` and `cid`. The record always has `$type`, `text` and `createdAt` (RFC 3339 with milliseconds and a `Z`), and the other fields appear only when present. When the quoted post is on another network, socli appends its link after a blank line instead of using an embed.
+A reply record carries `root` (the parent's own root when the parent is itself a reply, otherwise the parent) and `parent`. A quote is an `app.bsky.embed.record` embed with the quoted post's `uri` and `cid`. The record always has `$type`, `text` and `createdAt` (RFC 3339 with milliseconds and a `Z`), and the other fields appear only when present. When the quoted post is on another network, SoCLI appends its link after a blank line instead of using an embed.
 
 ## Bold and italic
 
-socli converts `<b>`, `<strong>`, `<i>` and `<em>` (nesting included) into Unicode sans-serif bold, italic and bold-italic letters, and bold digits, by default on every network (`src/rich.rs`). Unknown tags stay as typed. `--raw` sends the text as typed, with no conversion. Bluesky has no formatting in its text, so the converted letters are separate characters: screen readers may spell them out, and a search for the plain word does not match them. Each converted letter is one grapheme, so it counts as one character against the Bluesky limit.
+SoCLI converts `<b>`, `<strong>`, `<i>` and `<em>` (nesting included) into Unicode sans-serif bold, italic and bold-italic letters, and bold digits, by default on every network (`src/rich.rs`). Unknown tags stay as typed. `--raw` sends the text as typed, with no conversion. Bluesky has no formatting in its text, so the converted letters are separate characters: screen readers may spell them out, and a search for the plain word does not match them. Each converted letter is one grapheme, so it counts as one character against the Bluesky limit.
 
 ## Length
 

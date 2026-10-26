@@ -1207,7 +1207,7 @@ pub struct SoRow {
     pub pill: Option<usize>,
 }
 
-/// The socli mark: So in the foreground, the cursor pill in blue (`#1d9bf0`).
+/// The SoCLI mark: So in the foreground, the cursor pill in blue (`#1d9bf0`).
 ///
 /// Sampled from the dark-blue wordmark. The rounded square is the terminal ground, so it is not drawn.
 pub fn so_mark() -> &'static [SoRow] {
@@ -1249,7 +1249,7 @@ pub fn so_width() -> usize {
         .unwrap_or(0)
 }
 
-/// The socli S mark, five rows of half blocks. The ask box uses it when So_ does not fit.
+/// The SoCLI S mark, five rows of half blocks. The ask box uses it when So_ does not fit.
 pub fn logo() -> [String; 5] {
     const ROWS: [&str; 10] = [
         "..##########..",

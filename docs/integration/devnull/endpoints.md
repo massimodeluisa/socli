@@ -1,6 +1,6 @@
 # dev/null: endpoints
 
-The origin is `https://dev-null.sh`. socli calls the v1 API under `/api/v1/` and two CLI endpoints under `/api/cli/`. Requests time out after 20 seconds and send the user agent `socli/<version>`. The code is in `src/net/devnull/api.rs`, `sign.rs`, `ssh.rs`, `auth.rs` and `mod.rs`. Related pages: [overview](README.md), [auth](auth.md), [mapping](mapping.md), [testing](testing.md).
+The origin is `https://dev-null.sh`. SoCLI calls the v1 API under `/api/v1/` and two CLI endpoints under `/api/cli/`. Requests time out after 20 seconds and send the user agent `socli/<version>`. The code is in `src/net/devnull/api.rs`, `sign.rs`, `ssh.rs`, `auth.rs` and `mod.rs`. Related pages: [overview](README.md), [auth](auth.md), [mapping](mapping.md), [testing](testing.md).
 
 ## Conventions
 
@@ -64,6 +64,6 @@ The commit answer is parsed for a link of the form `https://dev-null.sh/@<user>/
 
 ## Upstream routes
 
-The routes file of the upstream repository (https://raw.githubusercontent.com/nunomaduro/dev-null.sh/production/routes/api.php, read 2026-10-20) defines `GET starred`, `POST` and `DELETE commits/{commit}/star`, `POST commits`, `DELETE commits/{commit}` and `GET commits/{commit}/replies`, and no `saved` or `bookmark` route. Upstream removed those on 2026-10-20 (commit 230c004a). socli no longer calls them.
+The routes file of the upstream repository (https://raw.githubusercontent.com/nunomaduro/dev-null.sh/production/routes/api.php, read 2026-10-20) defines `GET starred`, `POST` and `DELETE commits/{commit}/star`, `POST commits`, `DELETE commits/{commit}` and `GET commits/{commit}/replies`, and no `saved` or `bookmark` route. Upstream removed those on 2026-10-20 (commit 230c004a). SoCLI no longer calls them.
 
 Back to [network overview](../README.md).

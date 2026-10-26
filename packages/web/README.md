@@ -1,6 +1,6 @@
 # soclib
 
-soclib embeds the socli reader in a browser application. It runs the same Rust reader as the terminal client, compiled to WebAssembly inside a worker, and paints its cell updates with the website's renderer. The package includes the worker, styles, fonts, TypeScript declarations, and WASM module. Each mounted reader has its own session and shadow root.
+soclib embeds the SoCLI reader in a browser application. It runs the same Rust reader as the terminal client, compiled to WebAssembly inside a worker, and paints its cell updates with the website's renderer. The package includes the worker, styles, fonts, TypeScript declarations, and WASM module. Each mounted reader has its own session and shadow root.
 
 The native terminal package is `soclish`, available through `npx soclish` or `bunx soclish` after publication. The tag release workflow publishes both packages at the same version. Until the first release, use the output of the local packaging command below.
 

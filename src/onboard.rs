@@ -134,7 +134,7 @@ pub fn animated_body(
         Kind::Fg,
         "                ",
     );
-    put(&mut canvas, 0, crumb_x, Kind::Bold, "socli");
+    put(&mut canvas, 0, crumb_x, Kind::Bold, "SoCLI");
     put(&mut canvas, 0, crumb_x + 5, Kind::Dim, " > login ");
     let (lines, _, targets) = canvas.finish_targeted();
     let mut body = Body::text(lines);

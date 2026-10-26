@@ -559,7 +559,7 @@ fn write_http(stream: &mut impl Write, body: &str) -> std::io::Result<()> {
 
 fn page(message: &str) -> String {
     format!(
-        "<!doctype html><meta charset=utf-8><title>socli</title>\
+        "<!doctype html><meta charset=utf-8><title>SoCLI</title>\
 <body style=\"background:#000;color:#eee;font-family:ui-monospace,monospace;padding:3rem\">\
 <p>{message}</p></body>"
     )
@@ -701,7 +701,7 @@ fn authorization_code_params<'a>(
     ]
 }
 
-pub const NO_APP: &str = "this build has no socli X app";
+pub const NO_APP: &str = "this build has no SoCLI X app";
 
 /// SoCLI's public OAuth client. The id is not a secret.
 const DEFAULT_CLIENT_ID: &str = "RExTUlVaU1BXWHVla1VLOFR2WWs6MTpjaQ";
@@ -728,7 +728,7 @@ pub fn page_copy() -> (Vec<(String, String)>, String) {
         format!("{NO_APP}. Escape closes this.")
     };
     (
-        vec![("Sign-in method".into(), "Approve socli on X".into())],
+        vec![("Sign-in method".into(), "Approve SoCLI on X".into())],
         aside,
     )
 }

@@ -1,6 +1,6 @@
 ---
 title: Keys
-description: Keyboard shortcuts for the socli terminal reader, composer, command palette, dialogs and settings.
+description: Keyboard shortcuts for the SoCLI terminal reader, composer, command palette, dialogs and settings.
 ---
 
 # Keys

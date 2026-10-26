@@ -24,7 +24,7 @@ const flatDocs = computed(() => theme.value.docs.flatMap((group) => group.items)
 
 const next = computed(() => {
   const items = flatDocs.value
-  if (!items.length) return { text: 'socli', link: '/' }
+  if (!items.length) return { text: 'SoCLI', link: '/' }
   const index = items.findIndex((item) => normalizeDocPath(item.link) === currentPath.value)
   return items[(index + 1) % items.length] ?? items[0]
 })
@@ -130,7 +130,7 @@ watch(
     <main v-if="page.isNotFound" id="content" class="doc">
       <h1>Page not found</h1>
       <p>
-        That page is not on this site. <a :href="withBase('/')">socli home</a> or
+        That page is not on this site. <a :href="withBase('/')">SoCLI home</a> or
         <a :href="withBase('/docs/')">the docs</a>.
       </p>
     </main>

@@ -1,6 +1,6 @@
 # Baidu Tieba
 
-socli does not support Baidu Tieba. The owner answered "Maybe also (later)" when it came up, so it is a candidate and not a decision, and no Tieba code exists in the repository: there is no provider under `src/net/`, no `[tieba]` section in `config.toml`, and no `tieba` value for `--net`. This page records what the maintainer found on 2026-10-20, so the question can be reopened without redoing the research.
+SoCLI does not support Baidu Tieba. The owner answered "Maybe also (later)" when it came up, so it is a candidate and not a decision, and no Tieba code exists in the repository: there is no provider under `src/net/`, no `[tieba]` section in `config.toml`, and no `tieba` value for `--net`. This page records what the maintainer found on 2026-10-20, so the question can be reopened without redoing the research.
 
 Part of the [integration overview](../README.md).
 
@@ -16,9 +16,9 @@ The maintainer read the project pages listed below and did not fetch them again 
 
 ## What an integration would need
 
-An integration would be an unofficial client inside socli that signs in with the `BDUSS` cookie. It would have these properties:
+An integration would be an unofficial client inside SoCLI that signs in with the `BDUSS` cookie. It would have these properties:
 
-- The cookie is a secret with the power of the account's password. socli would have to store it in `config.toml` with the same care as the tokens of the other networks, and the person signing in would hand over full account access instead of a scoped token.
+- The cookie is a secret with the power of the account's password. SoCLI would have to store it in `config.toml` with the same care as the tokens of the other networks, and the person signing in would hand over full account access instead of a scoped token.
 - Baidu offers no official API, so a change on its side can break the client without warning.
 - The libsgh/tieba-api project warns that its reply feature can get a whole forum banned, so a write feature would carry that risk.
 

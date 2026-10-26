@@ -1,6 +1,6 @@
 # Bluesky
 
-socli reads and writes Bluesky through the AT Protocol HTTP API (XRPC). Without an account it reads public posts, threads and profiles from the public AppView. With an app password it adds the Following timeline, Discover, bookmarks, mentions, search and every write action. The client lives in `src/net/bluesky/`, and the other pages in this folder describe its parts: [auth](auth.md), [endpoints](endpoints.md), [mapping](mapping.md) and [testing](testing.md). The overview of all networks is in [../README.md](../README.md).
+SoCLI reads and writes Bluesky through the AT Protocol HTTP API (XRPC). Without an account it reads public posts, threads and profiles from the public AppView. With an app password it adds the Following timeline, Discover, bookmarks, mentions, search and every write action. The client lives in `src/net/bluesky/`, and the other pages in this folder describe its parts: [auth](auth.md), [endpoints](endpoints.md), [mapping](mapping.md) and [testing](testing.md). The overview of all networks is in [../README.md](../README.md).
 
 ## Capabilities
 
@@ -41,14 +41,14 @@ The official rate-limit page (read 2026-10-20) states these limits for the hoste
 | `com.atproto.server.createSession`, per account | 30 per 5 minutes and 300 per day |
 | Record writes, per account | 5,000 points per hour and 35,000 per day (create 3, update 2, delete 1) |
 
-The page says the public AppView endpoints have generous limits, and that every number may change. socli does not count requests itself.
+The page says the public AppView endpoints have generous limits, and that every number may change. SoCLI does not count requests itself.
 
 ## Status
 
 Every row of the capability table has code behind it and unit tests over recorded responses. The calls against the live service need an account, so they are checked by hand (see [testing](testing.md)).
 
 - Sign-in uses an app password. OAuth needs a client metadata file hosted on a domain, so it is not built yet.
-- Search is blocked for signed-out clients by the AppView, so socli asks for a sign-in.
+- Search is blocked for signed-out clients by the AppView, so SoCLI asks for a sign-in.
 - Link previews render only in the full-screen reader, not in `--print` output.
 - Direct messages, lists, feeds other than Following and Discover, and image uploads have no code. Posts carry text only.
 

@@ -1,11 +1,11 @@
 ---
 title: Configuration
-description: Where socli keeps its settings, every config key, and the environment variables that override them.
+description: Where SoCLI keeps its settings, every config key, and the environment variables that override them.
 ---
 
 # Configuration
 
-socli reads `$SOCLI_CONFIG_DIR/config.toml`, else `$XDG_CONFIG_HOME/socli/config.toml`, else `~/.config/socli/config.toml`. The file has mode `0600` in a directory with mode `0700`, and every write replaces it atomically.
+SoCLI reads `$SOCLI_CONFIG_DIR/config.toml`, else `$XDG_CONFIG_HOME/socli/config.toml`, else `~/.config/socli/config.toml`. The file has mode `0600` in a directory with mode `0700`, and every write replaces it atomically.
 
 ## Commands
 

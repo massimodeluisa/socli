@@ -1,4 +1,4 @@
-//! socli — the reader, shared by the terminal binary and the browser demo.
+//! SoCLI — the reader, shared by the terminal binary and the browser demo.
 
 pub mod agent;
 pub mod chrome;

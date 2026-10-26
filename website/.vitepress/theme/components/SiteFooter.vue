@@ -15,6 +15,7 @@ const keysHref = computed(() =>
 <template>
   <footer>
     <a :href="theme.repo">source</a>
+    <a href="https://github.com/massimodeluisa/socli/issues/new">questions</a>
     <a :href="withBase('/docs/')">docs</a>
     <a :href="withBase('/privacy.html')">privacy</a>
     <a :href="withBase('/data-deletion.html')">data deletion</a>

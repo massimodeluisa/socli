@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
     <div class="term" id="term">
       <div class="term-bar">
         <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="term-title">socli</span>
+        <span class="term-title">SoCLI</span>
         <span class="term-tools">
           <span class="term-sizes" role="group" aria-label="Window size">
             <button type="button" class="size-btn" data-size="mobile" aria-pressed="false" title="Mobile">
@@ -73,7 +73,7 @@ onBeforeUnmount(() => {
           </span>
         </span>
       </div>
-      <div class="screen" id="screen" tabindex="0" role="application" aria-label="socli reader">
+      <div class="screen" id="screen" tabindex="0" role="application" aria-label="SoCLI reader">
         <div class="wasm-grid" id="grid"></div>
         <div class="chrome" id="chrome-top"></div>
         <div class="feed" id="feed"></div>

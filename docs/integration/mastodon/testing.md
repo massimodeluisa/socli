@@ -12,10 +12,10 @@ export SOCLI_CONFIG_DIR=$D SOCLI_CACHE_DIR=$D/cache NO_COLOR=1
 socli feed --demo --print --no-prompt --width 100 --no-icons --net mastodon
 ```
 
-The first line should read `socli › mastodon › home`, and the tab row `[1 Home]  2 Trending  3 Bookmarks`. The demo post is by Ines Duarte (`@ines@mastodon.social`), with one reply by Theo Lang (`@theo@fosstodon.org`). The first lines of the output:
+The first line should read `SoCLI › mastodon › home`, and the tab row `[1 Home]  2 Trending  3 Bookmarks`. The demo post is by Ines Duarte (`@ines@mastodon.social`), with one reply by Theo Lang (`@theo@fosstodon.org`). The first lines of the output:
 
 ```
-  socli › mastodon › home                                                                     demo
+  SoCLI › mastodon › home                                                                     demo
 
   All  ○ X  ○ Bluesky  ○ dev/null  ○ Threads  [● Mastodon]  │  [1 Home]  2 Trending  3 Bookmarks
 ```
@@ -65,7 +65,7 @@ Settings changed in the reader and the `d` and `D` keys save to the real configu
 
 These steps talk to the real service. Run them in a terminal and on an account you accept to post from.
 
-1. Sign in with the browser path: `socli login mastodon --server <host>`, open the address, approve socli and paste the code. Or create a token in Preferences > Development with the scopes `read write` and run `socli login mastodon --server <host> --token <token>`. Check with `socli auth status`, which should show `@<user>@<host>`, a redacted token, the server and `registered` or `none` for the app.
+1. Sign in with the browser path: `socli login mastodon --server <host>`, open the address, approve SoCLI and paste the code. Or create a token in Preferences > Development with the scopes `read write` and run `socli login mastodon --server <host> --token <token>`. Check with `socli auth status`, which should show `@<user>@<host>`, a redacted token, the server and `registered` or `none` for the app.
 2. Read: `socli feed --net mastodon --print`, then `socli feed discover --net mastodon --print` (Trending), `socli bookmarks --net mastodon --print` and `socli notifications --net mastodon --print`.
 3. Open a thread from the feed, then a link from another server: `socli thread https://<other-server>/@<user>/<id> --net mastodon --print`. It resolves through search and needs the session.
 4. Search: `socli search <words> --net mastodon --print`, and `socli search "#tag" --net mastodon --print` for the hashtag timeline. Signed out, the same commands ask you to sign in.

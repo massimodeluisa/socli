@@ -63,7 +63,7 @@ fn ask_server() -> Result<String, String> {
     loop {
         screens::present_login(
             Network::Mastodon.title(),
-            &[("Sign-in method", "Approve socli on your Mastodon server")],
+            &[("Sign-in method", "Approve SoCLI on your Mastodon server")],
             "Enter your server, or press Enter to use mastodon.social.",
             Some(&format!("Server ({DEFAULT_SERVER}):")),
         )?;
@@ -175,10 +175,10 @@ pub fn login(server: Option<String>, token: Option<String>) -> Result<(), String
         Network::Mastodon.title(),
         &[
             ("Server", &server),
-            ("Sign-in method", "Approve socli in your browser"),
+            ("Sign-in method", "Approve SoCLI in your browser"),
             ("Code", "paste it below"),
         ],
-        &format!("{url}\n\nApprove socli in the browser, then paste the code it shows."),
+        &format!("{url}\n\nApprove SoCLI in the browser, then paste the code it shows."),
         Some("Authorization code:"),
     )?;
     let _ = util::open_browser(&url);
@@ -210,7 +210,7 @@ pub fn login(server: Option<String>, token: Option<String>) -> Result<(), String
     finish(server, access_token, Some((client_id, client_secret)))
 }
 
-/// The app socli registered on `server`: the saved one, else a new one that is saved at once.
+/// The app SoCLI registered on `server`: the saved one, else a new one that is saved at once.
 fn app(http: &Client, server: &str) -> Result<(String, String), String> {
     let saved = config::load()?.mastodon;
     if let (Some(id), Some(secret)) = (&saved.client_id, &saved.client_secret) {
@@ -221,7 +221,7 @@ fn app(http: &Client, server: &str) -> Result<(String, String), String> {
     let response = http
         .post(format!("https://{server}/api/v1/apps"))
         .form(&[
-            ("client_name", "socli"),
+            ("client_name", "SoCLI"),
             ("redirect_uris", REDIRECT),
             ("scopes", SCOPES),
         ])
@@ -319,7 +319,7 @@ pub fn begin_page(server: &str, redirect: &str) -> Result<String, String> {
     let response = http
         .post(format!("https://{server}/api/v1/apps"))
         .form(&[
-            ("client_name", "socli"),
+            ("client_name", "SoCLI"),
             ("redirect_uris", redirect.as_str()),
             ("scopes", SCOPES),
         ])

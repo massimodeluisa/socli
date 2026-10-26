@@ -1,6 +1,6 @@
 # Testing X
 
-The X client has two kinds of checks. The demo mode and the dry run exercise socli's screens, ids, quote handling and length counter without any account. The unit tests cover parsing, cookie decryption, token handling and counting with inline JSON, and they never call X. Anything that needs X's servers is marked below.
+The X client has two kinds of checks. The demo mode and the dry run exercise SoCLI's screens, ids, quote handling and length counter without any account. The unit tests cover parsing, cookie decryption, token handling and counting with inline JSON, and they never call X. Anything that needs X's servers is marked below.
 
 Back to [X](README.md). Related: [auth](auth.md), [endpoints](endpoints.md), [mapping](mapping.md).
 
@@ -29,7 +29,7 @@ The trending feed is not built for X, and the command says so:
 ./target/debug/socli --demo feed trending --net x --print --no-prompt --width 100
 ```
 
-It prints "socli: X has no trending feed in socli yet. Try `socli search <words> --net x`".
+It prints "SoCLI: X has no trending feed in SoCLI yet. Try `socli search <words> --net x`".
 
 Write commands accept `--dry-run`, which checks the length and the target without sending anything:
 
@@ -56,7 +56,7 @@ Remove the directory when you are done: `rm -r "$D"`.
 
 The default sign-in uses a browser that is already signed in at https://x.com. It does not spend official API credits.
 
-1. Sign in: `SOCLI_AGENT=0 socli login x`. socli prints the account and the browser profile it read.
+1. Sign in: `SOCLI_AGENT=0 socli login x`. SoCLI prints the account and the browser profile it read.
 2. Check what was stored: `socli auth status` (the browser session shows `missing`, `set` or only its last four characters) and `socli whoami`.
 3. Read: `socli feed following --net x --json`, `socli feed --net x --json` for For you, `socli feed latest --net x --json`, `socli bookmarks --net x --json`, `socli notifications --net x --json`, `socli search rust --net x --json`, `socli user @handle --net x --json`, `socli thread <post link> --json`.
 4. On a post you can undo: `socli bookmark <id> --net x` then `socli unbookmark <id> --net x`, and `socli like <id> --net x` then `socli unlike <id> --net x` when the post is not already liked. Do not unfollow someone to test follow. A follow of an account you already follow comes back as already following and leaves the state as it was.
@@ -65,12 +65,12 @@ The default sign-in uses a browser that is already signed in at https://x.com. I
 The official API path uses a developer account and real credits. Reads are billed per post returned and writes per request (see [pricing](https://docs.x.com/x-api/getting-started/pricing), checked 2026-10-20), so keep pages small.
 
 1. Create an app in the developer console, enable OAuth 2.0, and add the callback `http://127.0.0.1:8741/callback` (see [auth](auth.md)).
-2. Sign in: `socli login x --oauth --client-id <id>`. A browser opens. Approve the app. socli prints the signed-in account.
+2. Sign in: `socli login x --oauth --client-id <id>`. A browser opens. Approve the app. SoCLI prints the signed-in account.
 3. Check what was stored: `socli auth status` (the user token, app bearer and client id each show `missing`, `set` or only their last four characters) and `socli whoami`.
 4. Read the same commands as above. For you on this path is the `latest_query` search.
 5. Write on a post you own, then undo each step: `socli post "test" --net x`, `socli like <id> --net x` then `socli unlike <id> --net x`, `socli bookmark <id> --net x` then `socli unbookmark <id> --net x`, `socli repost <id> --net x` then `socli unrepost <id> --net x`, and `socli delete <id> --net x` for the test post. Like and follow calls may fail with the Enterprise hint described on the [overview page](README.md).
 6. Quote: `socli quote <id> "text" --net x` posts your text plus the link of the quoted post.
-7. Token refresh: after the access token expires (two hours without `offline.access`), run any read again. socli refreshes once and carries on. This cannot be checked without waiting for the expiry.
+7. Token refresh: after the access token expires (two hours without `offline.access`), run any read again. SoCLI refreshes once and carries on. This cannot be checked without waiting for the expiry.
 8. Sign out: `socli logout x`. `socli auth status` then shows no user token, and the client id stays.
 
 Agent behavior: with `SOCLI_AGENT=1`, `socli login x` must exit with code 2 and the message "signing in to X needs a person at a browser. Run socli login x in a terminal".
@@ -99,4 +99,4 @@ All of these run with `cargo test`. The X client keeps its test responses inline
 
 ## What needs an account
 
-The authorize and token exchange against `x.com` and `api.x.com`, the exact fields X returns today, rate-limit and credit errors (402 and 429), `note_tweet` long posts, the refresh after expiry, and the self-serve refusals on likes, follows and replies. The unit tests show that socli parses the response shapes written into them, not that X still sends those shapes today.
+The authorize and token exchange against `x.com` and `api.x.com`, the exact fields X returns today, rate-limit and credit errors (402 and 429), `note_tweet` long posts, the refresh after expiry, and the self-serve refusals on likes, follows and replies. The unit tests show that SoCLI parses the response shapes written into them, not that X still sends those shapes today.

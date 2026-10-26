@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img">
-<title>socli</title>
+<title>SoCLI</title>
 <style>
   .on-dark { display: none; }
   @media (prefers-color-scheme: dark) {

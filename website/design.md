@@ -1,12 +1,12 @@
 ---
 layout: book
 title: Brand
-description: The socli mark is So_, a rounded square with the name and the cursor.
+description: The SoCLI mark is So_, a rounded square with the name and the cursor.
 ---
 
 # Brand
 
-<p class="lede">So_ is the socli mark. The rounded square is the terminal. So, in Geist Mono Bold, is the name. The capsule on that same baseline is the cursor.</p>
+<p class="lede">So_ is the SoCLI mark. The rounded square is the terminal. So, in Geist Mono Bold, is the name. The capsule on that same baseline is the cursor.</p>
 
 <div class="hero">
   <div class="hero-plate">

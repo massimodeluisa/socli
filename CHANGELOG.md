@@ -4,28 +4,25 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-26
+
+- Named the product SoCLI in the reader, the site, and the docs.
+- Showed the Threads exchange error instead of a bare 502.
+- Added the AI readiness badge, an Agent Skills format badge, and a blinking logo on the README.
+- Set a longer homepage title, a logo alt text, and HSTS.
+- Forwarded a badge X sign-in to the private address in its state.
+- Showed the current version on the homepage.
 - Replaced the Open Graph image and linked the site icons to the brand files.
-
 - Removed the invalid timeout from the reusable website job.
-
 - Kept the usage line as socli on Windows, where the executable name is socli.exe.
-
 - Wrote mouse-off sequences to the terminal instead of restoring a Windows console mode, and tested cookie permission errors by kind.
-
 - Named the published npm packages in the contributor docs.
-
 - Included npm's own error text when publication fails.
-
 - Pinned GitHub Actions to commit SHAs, gated Windows in CI, and dropped the npm token so publication uses GitHub OIDC.
-
 - Fixed Windows compilation by registering SIGHUP only on Unix and widened the watchdog restore bound.
-
 - Bundled all six native executables into the soclish npm package and published the browser library as @massimodeluisa/soclib.
-
 - Grouped Homebrew architectures under one block per operating system and removed a redundant version declaration.
-
 - Added tag-gated deployment to the existing Cloudflare site worker and made the hosting target explicit.
-
 - Resolved npm tarball paths before publication so npm did not interpret them as GitHub repositories.
 
 ## [0.1.1] - 2026-10-25

@@ -26,7 +26,7 @@ type ProfilePage = Result<(User, Page), NetError>;
 
 pub const NO_ACCOUNTS: &str =
     "no accounts yet. `socli login bluesky` (or x, devnull, threads, mastodon), or `socli --demo`.";
-/// The `socli>` prompt's answer to a tab word in All scope.
+/// The `SoCLI>` prompt's answer to a tab word in All scope.
 pub const PICK_NETWORK_FIRST: &str = "pick a network first: net <slug>";
 /// The status at demo startup; the reader clears it on the first key press.
 pub const DEMO_NOTICE: &str = "demo feed · socli login <network> for your timelines";
@@ -84,7 +84,7 @@ pub enum MergedTab {
 impl MergedTab {
     pub const ALL: [MergedTab; 3] = [MergedTab::Home, MergedTab::Discover, MergedTab::Saved];
 
-    /// The crumb word, also what the `socli>` prompt types.
+    /// The crumb word, also what the `SoCLI>` prompt types.
     pub fn word(self) -> &'static str {
         match self {
             MergedTab::Home => "home",
@@ -621,7 +621,7 @@ impl State {
         }
     }
 
-    /// Opens an All view tab and loads it; the `socli>` prompt's `home`, `discover` and `saved`.
+    /// Opens an All view tab and loads it; the `SoCLI>` prompt's `home`, `discover` and `saved`.
     pub fn open_merged_tab(&mut self, tab: MergedTab, clients: &mut Clients) -> Result<(), String> {
         if !self.merged_tabs().contains(&tab) {
             return Err(match tab.kind() {

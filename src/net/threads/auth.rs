@@ -1,5 +1,5 @@
 /*!
-Threads sign-in. The default opens Threads' approval window for the socli app and trades the
+Threads sign-in. The default opens Threads' approval window for the SoCLI app and trades the
 code at the socli.sh exchange, which holds the app secret. A pasted token, and OAuth with your
 own app id and secret, stay available. A pasted token keeps the lifetime Meta gave it unless
 you also pass the secret. Docs:
@@ -36,7 +36,7 @@ pub const PUBLIC_REDIRECT: &str = "https://socli.sh/";
 /// The exchange holds the Threads app secret. The client sends the code and the redirect only.
 pub const EXCHANGE_URL: &str = "https://socli.sh/threads/token";
 
-pub const NO_APP: &str = "this build has no socli Threads app";
+pub const NO_APP: &str = "this build has no SoCLI Threads app";
 
 /// SoCLI's public Threads app id. The id is not a secret.
 const DEFAULT_APP_ID: &str = "2168336333756240";
@@ -226,7 +226,7 @@ pub fn page_copy() -> (Vec<(String, String)>, String) {
         format!("{NO_APP}. Escape closes this.")
     };
     (
-        vec![("Sign-in method".into(), "Approve socli on Threads".into())],
+        vec![("Sign-in method".into(), "Approve SoCLI on Threads".into())],
         aside,
     )
 }
@@ -290,7 +290,7 @@ fn login_shared(http: Client) -> Result<(), String> {
     let Some(app_id) = compiled_app_id() else {
         let _ = screens::present_login(
             Network::Threads.title(),
-            &[("Sign-in method", "Approve socli on Threads")],
+            &[("Sign-in method", "Approve SoCLI on Threads")],
             NO_APP,
             None,
         );
@@ -307,7 +307,7 @@ fn login_shared(http: Client) -> Result<(), String> {
     let _ = screens::present_login(
         Network::Threads.title(),
         &[
-            ("Sign-in method", "Approve socli on Threads"),
+            ("Sign-in method", "Approve SoCLI on Threads"),
             ("Waiting for the browser", "the address is on the right"),
         ],
         &format!("{url}\n\nwaiting for the callback on {PUBLIC_REDIRECT}"),
@@ -372,7 +372,7 @@ fn accept_code(listener: &std::net::TcpListener) -> Result<(String, String), Str
 #[cfg(not(target_arch = "wasm32"))]
 fn write_callback(stream: &mut impl std::io::Write, message: &str) -> std::io::Result<()> {
     let body = format!(
-        "<!doctype html><meta charset=utf-8><title>socli</title>\
+        "<!doctype html><meta charset=utf-8><title>SoCLI</title>\
 <body style=\"background:#000;color:#eee;font-family:ui-monospace,monospace;padding:3rem\">\
 <p>{message}</p></body>"
     );

@@ -3967,7 +3967,7 @@ impl SignInForm {
                 }],
                 vec![(
                     "Sign-in method".into(),
-                    "Approve socli on your Mastodon server".into(),
+                    "Approve SoCLI on your Mastodon server".into(),
                 )],
                 format!(
                     "Enter your server, or press Enter to use {}. socli registers itself there and opens the approval page. Escape closes this.",
@@ -4105,14 +4105,14 @@ fn devnull_page_copy() -> (Vec<(String, String)>, String) {
             ),
             (
                 "Approve in the browser".into(),
-                "socli opens dev-null.sh so you can approve this page.".into(),
+                "SoCLI opens dev-null.sh so you can approve this page.".into(),
             ),
             (
                 "Paste the callback".into(),
                 "devnull://auth/callback?code=…".into(),
             ),
         ],
-        "Approve socli in the browser. If the browser cannot open devnull://, copy the full callback URL from its address bar or the approval request's Location response header.".into(),
+        "Approve SoCLI in the browser. If the browser cannot open devnull://, copy the full callback URL from its address bar or the approval request's Location response header.".into(),
     )
 }
 
@@ -6607,14 +6607,14 @@ fn too_small(full: usize, height: usize) -> bool {
     full < render::MIN_COLS || height < render::MIN_ROWS
 }
 
-/// The only thing a terminal below the minimum size shows: what size socli needs, centered.
+/// The only thing a terminal below the minimum size shows: what size SoCLI needs, centered.
 fn draw_too_small(screen: &mut Screen) {
     if screen.full == 0 || screen.height == 0 {
         return;
     }
     let by = if screen.theme.ascii { 'x' } else { '×' };
     let text = format!(
-        "socli needs {}{by}{} · q quits",
+        "SoCLI needs {}{by}{} · q quits",
         render::MIN_COLS,
         render::MIN_ROWS
     );
@@ -9089,9 +9089,9 @@ mod tests {
         state.detail = Detail::Rich;
         let buffer = frame(&mut state, &ui, 92, 36);
         let text: String = buffer.content().iter().map(|cell| cell.symbol()).collect();
-        assert!(text.contains("Approve socli on X"), "{text}");
+        assert!(text.contains("Approve SoCLI on X"), "{text}");
         assert!(text.contains("Enter opens X"), "{text}");
-        assert!(!text.contains("this build has no socli X app"), "{text}");
+        assert!(!text.contains("this build has no SoCLI X app"), "{text}");
         assert!(!text.contains("Client id"), "{text}");
         assert!(!text.contains("console.x.com"), "{text}");
         assert!(!text.contains("Create an app"), "{text}");
@@ -9118,7 +9118,7 @@ mod tests {
         assert_eq!(column_of("▄██████▄"), Some(column), "{rows:#?}");
         assert_eq!(column_of("Sign in to X"), Some(column), "{rows:#?}");
         assert_eq!(column_of("Sign-in method"), Some(column), "{rows:#?}");
-        assert_eq!(column_of("Approve socli on X"), Some(column), "{rows:#?}");
+        assert_eq!(column_of("Approve SoCLI on X"), Some(column), "{rows:#?}");
         press(&mut state, &mut ui, KeyCode::Enter);
         assert!(matches!(ui.mode, Mode::SignIn(_)));
         let buffer = frame(&mut state, &ui, 92, 36);
@@ -9150,7 +9150,7 @@ mod tests {
         assert_eq!(form.value("Server"), "mastodon.social");
         let text = sign_in_text(Network::Mastodon, 92, 36);
         assert!(text.contains("mastodon.social"), "{text}");
-        assert!(text.contains("Approve socli"), "{text}");
+        assert!(text.contains("Approve SoCLI"), "{text}");
         assert!(text.contains("Server"), "{text}");
         assert!(!text.contains("Access token"), "{text}");
     }
@@ -9158,10 +9158,10 @@ mod tests {
     #[test]
     fn the_threads_sign_in_screen_approves_the_socli_app() {
         let text = sign_in_text(Network::Threads, 92, 36);
-        assert!(text.contains("Approve socli on Threads"), "{text}");
+        assert!(text.contains("Approve SoCLI on Threads"), "{text}");
         assert!(text.contains("Enter opens Threads"), "{text}");
         assert!(
-            !text.contains("this build has no socli Threads app"),
+            !text.contains("this build has no SoCLI Threads app"),
             "{text}"
         );
         assert!(!text.contains("Pass the token"), "{text}");
@@ -10789,7 +10789,7 @@ mod tests {
             let shown: Vec<&String> = rows.iter().filter(|row| !row.trim().is_empty()).collect();
             assert_eq!(shown.len(), 1, "{width}x{height}: {rows:#?}");
             assert!(
-                shown[0].contains("socli needs 24×8"),
+                shown[0].contains("SoCLI needs 24×8"),
                 "{width}x{height}: {rows:#?}"
             );
             assert!(ui.hits.borrow().targets.is_empty());
@@ -10800,7 +10800,7 @@ mod tests {
             60,
             7,
         ));
-        assert_eq!(rows[3].trim(), "socli needs 24×8 · q quits");
+        assert_eq!(rows[3].trim(), "SoCLI needs 24×8 · q quits");
         for quit in [
             key(KeyCode::Char('q')),
             key(KeyCode::Esc),
@@ -12557,7 +12557,7 @@ mod tests {
                 .iter()
                 .map(|cell| cell.symbol())
                 .collect::<String>();
-            assert!(text.contains("socli > login"), "{width}x{height}: {text}");
+            assert!(text.contains("SoCLI > login"), "{width}x{height}: {text}");
             assert!(!text.contains("Notifications"), "{text}");
             let targets = &ui.hits.borrow().targets;
             assert_eq!(

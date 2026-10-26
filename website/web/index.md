@@ -1,8 +1,8 @@
 ---
 layout: reader
-title: socli
+title: SoCLI
 titleTemplate: false
-description: The socli reader.
+description: The SoCLI reader.
 ---
 
 <div class="reader-only">

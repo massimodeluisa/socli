@@ -1,4 +1,4 @@
-//! Mastodon JSON to socli's posts, users and pages.
+//! Mastodon JSON to SoCLI's posts, users and pages.
 
 use std::collections::HashMap;
 

@@ -25,7 +25,7 @@ pub fn authorize(url: &url::Url) -> Result<String, String> {
         .map_err(|err| format!("could not prepare browser sign-in: {err}"))?;
     let plist = contents.join("Info.plist");
     if !plist.exists() {
-        std::fs::write(&plist, br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>sh.socli.browser-auth</string><key>CFBundleExecutable</key><string>socli-auth</string><key>CFBundleName</key><string>socli</string><key>CFBundlePackageType</key><string>APPL</string><key>LSUIElement</key><true/></dict></plist>"#)
+        std::fs::write(&plist, br#"<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>sh.socli.browser-auth</string><key>CFBundleExecutable</key><string>socli-auth</string><key>CFBundleName</key><string>SoCLI</string><key>CFBundlePackageType</key><string>APPL</string><key>LSUIElement</key><true/></dict></plist>"#)
             .map_err(|err| format!("could not prepare browser sign-in: {err}"))?;
     }
     match std::fs::OpenOptions::new()

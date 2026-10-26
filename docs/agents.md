@@ -1,6 +1,6 @@
 # Agents and scripts
 
-An AI coding agent or a script drives socli through one-shot commands that print JSON and exit, and never through the full-screen reader. socli turns that behavior on by itself when it recognizes an agent, and `--json` turns it on for any caller. This page describes how socli detects an agent, what changes in agent mode, the JSON each command prints, how to chain one command's output into the next, how errors and exit codes work, and how an agent can sign in. Every sample below was captured from a `--demo --json` run, so the ids and URLs are fixtures and nothing was sent to a network.
+An AI coding agent or a script drives SoCLI through one-shot commands that print JSON and exit, and never through the full-screen reader. SoCLI turns that behavior on by itself when it recognizes an agent, and `--json` turns it on for any caller. This page describes how SoCLI detects an agent, what changes in agent mode, the JSON each command prints, how to chain one command's output into the next, how errors and exit codes work, and how an agent can sign in. Every sample below was captured from a `--demo --json` run, so the ids and URLs are fixtures and nothing was sent to a network.
 
 ## Agent detection
 
@@ -27,10 +27,10 @@ An AI coding agent or a script drives socli through one-shot commands that print
 
 ## What changes in agent mode
 
-Agent mode makes socli safe to run with nobody at the terminal:
+Agent mode makes SoCLI safe to run with nobody at the terminal:
 
-- Output is JSON by default. `--print` asks for the text form instead, and `--print --no-prompt` leaves out the `socli>` prompt.
-- socli never opens the reader, never prompts and never reads a key. A command that would ask a question fails with a usage error instead.
+- Output is JSON by default. `--print` asks for the text form instead, and `--print --no-prompt` leaves out the `SoCLI>` prompt.
+- SoCLI never opens the reader, never prompts and never reads a key. A command that would ask a question fails with a usage error instead.
 - Text for `post`, `reply` and `quote` has to be given as an argument, or as `-` to read standard input. An empty command line does not read standard input in agent mode.
 - `delete` needs `--yes`, because there is nobody to answer `y/N`.
 - Errors print as one JSON line on stderr (see [Errors and exit codes](#errors-and-exit-codes)).
@@ -283,7 +283,7 @@ Messages are lowercase and say what to run next, for example `which network? add
 
 ## Writing safely
 
-Run every write with `--dry-run` first. The dry run reports the length and the limit on each network and fails for a network that is not signed in or lacks the feature, without sending anything. Show the person the text and the networks, then run the real command after an explicit confirmation. `post`, `reply`, `quote`, `delete` and `follow` are public or destructive, so an agent asks before each one. `delete --yes` skips socli's own question and nothing else asks in its place, so the confirmation belongs to the agent and the person.
+Run every write with `--dry-run` first. The dry run reports the length and the limit on each network and fails for a network that is not signed in or lacks the feature, without sending anything. Show the person the text and the networks, then run the real command after an explicit confirmation. `post`, `reply`, `quote`, `delete` and `follow` are public or destructive, so an agent asks before each one. `delete --yes` skips SoCLI's own question and nothing else asks in its place, so the confirmation belongs to the agent and the person.
 
 `<b>`, `<i>`, `<strong>` and `<em>` in post text become Unicode bold and italic letters. Screen readers spell those letters one by one, search does not match them, and on X each counts as two characters, so use `--raw` to send the text as typed.
 

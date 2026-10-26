@@ -12,11 +12,11 @@ export SOCLI_CONFIG_DIR=$D SOCLI_CACHE_DIR=$D/cache NO_COLOR=1
 socli feed --demo --print --no-prompt --width 100 --no-icons --net devnull
 ```
 
-The first line should read `socli › dev/null › following`, and the tab row `[1 Following]  2 Latest  3 Trending  4 Starred`. The demo author is `@nuno`.
+The first line should read `SoCLI › dev/null › following`, and the tab row `[1 Following]  2 Latest  3 Trending  4 Starred`. The demo author is `@nuno`.
 
 | Check | Command | Expect |
 | --- | --- | --- |
-| Starred | `socli feed saved --demo --net devnull --print --width 80 --no-icons` | The crumb `socli › dev/null › starred` and tab 4 (Starred) selected |
+| Starred | `socli feed saved --demo --net devnull --print --width 80 --no-icons` | The crumb `SoCLI › dev/null › starred` and tab 4 (Starred) selected |
 | Bookmark | `socli bookmark devnull:p3 --demo` | `✗ dev/null  dev/null has no bookmarks in its API` on the error output, exit status 1 |
 | Thread | `socli thread devnull:p3 --demo --print --width 80 --no-icons` | The post and its replies |
 | JSON | `socli feed --demo --json --net devnull` | `network` is `devnull` and `permalink` is under `https://dev-null.sh/@` |
@@ -62,6 +62,6 @@ Run them with `cargo test`.
 
 ## What needs an account
 
-No test calls the live service. By hand only: the device approval and its callback, real signature acceptance by the server (the fixtures prove that socli's signatures verify with `ssh-keygen`, not that the server accepts them), the GitHub key lookup, commit posting through `/api/cli/commits`, the signed feeds and the rate-limit answers.
+No test calls the live service. By hand only: the device approval and its callback, real signature acceptance by the server (the fixtures prove that SoCLI's signatures verify with `ssh-keygen`, not that the server accepts them), the GitHub key lookup, commit posting through `/api/cli/commits`, the signed feeds and the rate-limit answers.
 
 Back to [network overview](../README.md).

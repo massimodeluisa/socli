@@ -1,6 +1,6 @@
 ---
 layout: home
-title: socli
+title: SoCLI, a thread-first terminal client
 titleTemplate: false
 description: Cross-platform TUI social media client for X, Bluesky, dev/null, Threads and Mastodon.
 ---
@@ -15,7 +15,7 @@ description: Cross-platform TUI social media client for X, Bluesky, dev/null, Th
 
 <InstallCommand />
 
-<p class="meta"><span>0.1.0</span> <a href="https://github.com/massimodeluisa/socli/blob/main/LICENSE">MIT</a> <span><code>npx soclish --demo</code> needs no account</span></p>
+<p class="meta"><span>0.1.2</span> <a href="https://github.com/massimodeluisa/socli/blob/main/LICENSE">MIT</a> <span><code>npx soclish --demo</code> needs no account</span></p>
 
 <nav class="nets" aria-label="Networks">
   <a href="docs/networks.html#x">X</a>
@@ -23,7 +23,7 @@ description: Cross-platform TUI social media client for X, Bluesky, dev/null, Th
   <a class="amber" href="docs/networks.html#dev-null">dev/null</a>
   <a class="violet" href="docs/networks.html#threads">Threads</a>
   <a class="indigo" href="docs/networks.html#mastodon">Mastodon</a>
-  <a class="dim" href="https://github.com/massimodeluisa/socli/issues/new?title=Request%20a%20network&body=Network%3A%0A%0AWhat%20should%20socli%20read%20and%20write%20there%3F%0A%0AAPI%20documentation%3A%0A">Request one</a>
+  <a class="dim" href="https://github.com/massimodeluisa/socli/issues/new?title=Request%20a%20network&body=Network%3A%0A%0AWhat%20should%20SoCLI%20read%20and%20write%20there%3F%0A%0AAPI%20documentation%3A%0A">Request one</a>
 </nav>
 
 </div>
@@ -90,7 +90,7 @@ Pipe feeds and command results to other tools with `--json`. Coding agents get J
 
 <h2><a href="docs/web.html">WebAssembly in the browser</a></h2>
 
-The reader on this page is the socli program, compiled to WebAssembly, with the same keys and layout. It opens the welcome screen until this site has an account. Bluesky, Mastodon, Threads and X sign in and read here. X and Threads open an approval page when this build includes socli's app id. A build without that id says so. X on the page uses the official API, so For you is a search, and likes and follows can be refused. The local docs server forwards only `api.x.com` for the X token exchange, and a static host such as GitHub Pages does not. Threads sends the approval code to `https://socli.sh/threads/token`, which holds the app secret. The Threads app is published. dev/null signs in on the page: it opens the approval on dev-null.sh, and you paste the `devnull://` callback. GitHub SSH signing stays in the terminal. `socli login x` in a terminal still imports the browser session. The page keeps its config, tokens included, in this origin's local storage. Rich mode draws profile pictures and post images on the page, including a signed-in timeline, by loading each image from its URL. `ui.images` set to `off` keeps the image card. kitty, iTerm2 and sixel stay in the terminal. The buttons above the reader set a mobile, tablet, or desktop window, and full screen opens a page that is only the reader.
+The reader on this page is the SoCLI program, compiled to WebAssembly, with the same keys and layout. It opens the welcome screen until this site has an account. Bluesky, Mastodon, Threads and X sign in and read here. X and Threads open an approval page when this build includes SoCLI's app id. A build without that id says so. X on the page uses the official API, so For you is a search, and likes and follows can be refused. The local docs server forwards only `api.x.com` for the X token exchange, and a static host such as GitHub Pages does not. Threads sends the approval code to `https://socli.sh/threads/token`, which holds the app secret. The Threads app is published. dev/null signs in on the page: it opens the approval on dev-null.sh, and you paste the `devnull://` callback. GitHub SSH signing stays in the terminal. `socli login x` in a terminal still imports the browser session. The page keeps its config, tokens included, in this origin's local storage. Rich mode draws profile pictures and post images on the page, including a signed-in timeline, by loading each image from its URL. `ui.images` set to `off` keeps the image card. kitty, iTerm2 and sixel stay in the terminal. The buttons above the reader set a mobile, tablet, or desktop window, and full screen opens a page that is only the reader.
 
 </section>
 

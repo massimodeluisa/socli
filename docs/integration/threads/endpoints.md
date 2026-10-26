@@ -1,6 +1,6 @@
 # Threads endpoints
 
-socli calls the Threads API at `https://graph.threads.com/v1.0`, plus three token endpoints on `https://graph.threads.com`. The code is in `src/net/threads/mod.rs` and `src/net/threads/auth.rs`. The token goes in an `access_token` query or form parameter on every call, and socli keeps the request URL out of every error message so the token never shows up in output.
+SoCLI calls the Threads API at `https://graph.threads.com/v1.0`, plus three token endpoints on `https://graph.threads.com`. The code is in `src/net/threads/mod.rs` and `src/net/threads/auth.rs`. The token goes in an `access_token` query or form parameter on every call, and SoCLI keeps the request URL out of every error message so the token never shows up in output.
 
 Back to [Threads](README.md). Related: [auth](auth.md), [mapping](mapping.md), [testing](testing.md).
 
@@ -17,7 +17,7 @@ Each read asks for an explicit list of fields. The three post lists differ in wh
 
 ## Reads
 
-| Method and path | Parameters socli sends | Triggered by | Pagination |
+| Method and path | Parameters SoCLI sends | Triggered by | Pagination |
 | --- | --- | --- | --- |
 | `GET /me` | profile fields | sign-in check, and `socli user` with no handle, `me` or your own handle | none |
 | `GET /me/threads` | own post fields, `limit` (1 to 100) | the `Your threads` feed (`socli feed mine --net threads`), merged Home, and your profile screen | `after`, from `paging.cursors.after` |
@@ -28,7 +28,7 @@ Each read asks for an explicit list of fields. The three post lists differ in wh
 
 A cursor is offered as the next page only when the response has `paging.next` or the page came back full.
 
-When a list contains reposts or quotes that arrive as a bare id, socli fetches up to ten of them with `GET /{id}` after the list call. A failed fetch leaves the bare entry in place. `socli thread` returns one flat list with no next page and drops duplicate ids.
+When a list contains reposts or quotes that arrive as a bare id, SoCLI fetches up to ten of them with `GET /{id}` after the list call. A failed fetch leaves the bare entry in place. `socli thread` returns one flat list with no next page and drops duplicate ids.
 
 ## Writes
 
@@ -43,7 +43,7 @@ A post is published in two calls, as Meta's create-post flow requires: a contain
 | `DELETE /{id}` | none | `socli delete` |
 | `POST /{id}/repost` | none | `socli repost` |
 
-If the status poll itself fails, socli carries on to publish. A status of `ERROR` or `EXPIRED` stops the post with "Threads could not prepare the post: {reason}. check the text and try again". If the follow-up `GET /{id}` fails, the posted text is used in place of the fetched fields. A delete whose response says `success: false` is reported as "threads did not delete the post. check that it is yours and try again".
+If the status poll itself fails, SoCLI carries on to publish. A status of `ERROR` or `EXPIRED` stops the post with "Threads could not prepare the post: {reason}. check the text and try again". If the follow-up `GET /{id}` fails, the posted text is used in place of the fetched fields. A delete whose response says `success: false` is reported as "threads did not delete the post. check that it is yours and try again".
 
 The client never calls an endpoint for likes, bookmarks, follows or undoing a repost; those return an unsupported error before any request.
 
@@ -70,4 +70,4 @@ The client never calls an endpoint for likes, bookmarks, follows or undoing a re
 | an OAuth endpoint body with `error_message` | "threads: {text}" |
 | anything else | "Threads returned {status}" |
 
-A successful response that is not JSON is reported as a parse error. A connection failure is reported as "could not reach threads: {reason}. check your connection and try again". socli does not retry any call.
+A successful response that is not JSON is reported as a parse error. A connection failure is reported as "could not reach threads: {reason}. check your connection and try again". SoCLI does not retry any call.

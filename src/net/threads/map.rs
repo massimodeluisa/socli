@@ -55,6 +55,18 @@ pub fn error_from_body(status: u16, retry_after: Option<u64>, body: &str) -> Net
             }
         };
     }
+    if let Some(text) = value
+        .get("error")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+    {
+        return NetError::Http {
+            net: NET,
+            status,
+            message: format!("threads: {text}"),
+        };
+    }
     let message = match value.get("error_message").and_then(Value::as_str) {
         Some(text) => format!("threads: {text}"),
         None => format!("Threads returned {status}"),
@@ -522,6 +534,20 @@ mod tests {
         match error_from_body(400, None, body) {
             NetError::Http { message, .. } => {
                 assert!(message.contains("Invalid authorization code"))
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn exchange_errors_keep_the_worker_message() {
+        let body = r#"{"error":"Invalid verification code"}"#;
+        match error_from_body(502, None, body) {
+            NetError::Http {
+                status, message, ..
+            } => {
+                assert_eq!(status, 502);
+                assert!(message.contains("Invalid verification code"), "{message}");
             }
             other => panic!("unexpected {other:?}"),
         }

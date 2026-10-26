@@ -1,4 +1,4 @@
-//! The `socli>` command line. Same grammar in the reader and the scrollback prompt.
+//! The `SoCLI>` command line. Same grammar in the reader and the scrollback prompt.
 
 use crate::model::{Scope, Section};
 use crate::net::{FeedKind, Network};

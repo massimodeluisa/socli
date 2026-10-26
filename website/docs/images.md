@@ -1,11 +1,11 @@
 ---
 title: Images
-description: How socli draws pictures in the terminal, and how to choose the graphics mode.
+description: How SoCLI draws pictures in the terminal, and how to choose the graphics mode.
 ---
 
 # Images
 
-Images need a graphics protocol: kitty, iTerm2 or sixel. Without one, socli paints half blocks, and inside tmux it always uses half blocks. Apple Terminal always uses half blocks too, and socli does not send it the kitty probe, because Terminal prints that probe and any kitty or iTerm image as text. The `auto` mode asks every other terminal what it supports and takes the best protocol it finds.
+Images need a graphics protocol: kitty, iTerm2 or sixel. Without one, SoCLI paints half blocks, and inside tmux it always uses half blocks. Apple Terminal always uses half blocks too, and SoCLI does not send it the kitty probe, because Terminal prints that probe and any kitty or iTerm image as text. The `auto` mode asks every other terminal what it supports and takes the best protocol it finds.
 
 ## In the reader
 
@@ -20,7 +20,7 @@ socli view x:1848213… --json
 
 `socli view` shows a post's images in the terminal. It takes a post id, a post link, an image URL, a file or `demo`, and `--json` prints the image URLs instead of drawing them.
 
-Pictures from posts and link pages load only from public addresses, and socli checks every redirect before it follows one. A local file opens only when you pass its path to `socli view <path>`.
+Pictures from posts and link pages load only from public addresses, and SoCLI checks every redirect before it follows one. A local file opens only when you pass its path to `socli view <path>`.
 
 ## Choosing the mode
 

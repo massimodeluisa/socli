@@ -12,7 +12,7 @@ export SOCLI_CONFIG_DIR=$D SOCLI_CACHE_DIR=$D/cache NO_COLOR=1
 socli feed --demo --print --no-prompt --width 100 --no-icons --net bluesky
 ```
 
-The first line should read `socli › bluesky › following`, and the tab row `[1 Following]  2 Discover  3 Bookmarks`. The demo authors have handles such as `@ada.bsky.social`.
+The first line should read `SoCLI › bluesky › following`, and the tab row `[1 Following]  2 Discover  3 Bookmarks`. The demo authors have handles such as `@ada.bsky.social`.
 
 | Check | Command | Expect |
 | --- | --- | --- |

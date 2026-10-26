@@ -1,11 +1,11 @@
 ---
 name: socli
-description: Read and write X, Bluesky, dev/null, Threads and Mastodon from the terminal with the socli CLI. Use when the user asks to read a feed, a thread, mentions or search results on one of those networks, or to post, reply, quote, like, repost, bookmark, follow or delete there. Covers JSON output, scoped post ids, dry runs and the confirmation rule for public writes.
+description: Read and write X, Bluesky, dev/null, Threads and Mastodon from the terminal with the SoCLI CLI. Use when the user asks to read a feed, a thread, mentions or search results on one of those networks, or to post, reply, quote, like, repost, bookmark, follow or delete there. Covers JSON output, scoped post ids, dry runs and the confirmation rule for public writes.
 ---
 
-# socli
+# SoCLI
 
-`socli` is a terminal client for X, Bluesky, dev/null, Threads and Mastodon. When an agent runs it, output is JSON, nothing prompts and no key is read. Run `socli help <command>` for the flags of one command, or `socli help --json` for the full table.
+SoCLI is a terminal client for X, Bluesky, dev/null, Threads and Mastodon. When an agent runs `socli`, output is JSON, nothing prompts and no key is read. Run `socli help <command>` for the flags of one command, or `socli help --json` for the full table.
 
 ## Rules
 
@@ -28,7 +28,7 @@ socli whoami                          # which networks are signed in
 socli auth status                     # configuration, secrets redacted
 ```
 
-Without `--net`, socli reads every signed-in network. `--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon`, a comma list or `all`. `--count <n>` sets the posts asked for per network (15 by default). On X each post read is billed, so do not page without a reason.
+Without `--net`, SoCLI reads every signed-in network. `--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon`, a comma list or `all`. `--count <n>` sets the posts asked for per network (15 by default). On X each post read is billed, so do not page without a reason.
 
 Useful post fields: `id`, `network`, `url`, `text`, `created_at`, `author.username`, `in_reply_to`, `conversation_id`, `metrics`, `liked`, `reposted`, `bookmarked`, `links`, `media`, `quoted`.
 
@@ -74,4 +74,4 @@ X and dev/null sign-ins need a browser, and so does `socli login mastodon` witho
 
 ## More
 
-The full guide, with every JSON shape, is `docs/agents.md` in the socli repository. `--demo` runs against an offline feed and sends nothing, which is the right way to test a script.
+The full guide, with every JSON shape, is `docs/agents.md` in the SoCLI repository. `--demo` runs against an offline feed and sends nothing, which is the right way to test a script.

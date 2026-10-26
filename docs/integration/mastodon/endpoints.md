@@ -4,7 +4,7 @@ Every call goes to `https://<server>` plus the path in the tables below. The ser
 
 ## Reads
 
-All reads use GET. `limit` is clamped to 1 through 40. Every paginated call adds the cursor from the previous answer (see [pagination](#pagination)). Calls marked "token" are refused by socli before any request when no token exists (``sign in first: `socli login mastodon` ``).
+All reads use GET. `limit` is clamped to 1 through 40. Every paginated call adds the cursor from the previous answer (see [pagination](#pagination)). Calls marked "token" are refused by SoCLI before any request when no token exists (``sign in first: `socli login mastodon` ``).
 
 | Path | Parameters sent | Triggered by | Pagination |
 | --- | --- | --- | --- |
@@ -46,14 +46,14 @@ Favorite, boost and bookmark send the requested state without reading the post f
 
 | Method and path | Body | Triggered by |
 | --- | --- | --- |
-| `POST /api/v1/apps` | form: `client_name=socli`, `redirect_uris=urn:ietf:wg:oauth:2.0:oob`, `scopes=read write` | The browser path, when the saved section holds no app for that server |
-| `GET /oauth/authorize` | query: `response_type=code`, `client_id`, `redirect_uri`, `scope`, `code_challenge`, `code_challenge_method=S256` | Opened in the browser by the browser path. socli does not request it |
+| `POST /api/v1/apps` | form: `client_name=SoCLI`, `redirect_uris=urn:ietf:wg:oauth:2.0:oob`, `scopes=read write` | The browser path, when the saved section holds no app for that server |
+| `GET /oauth/authorize` | query: `response_type=code`, `client_id`, `redirect_uri`, `scope`, `code_challenge`, `code_challenge_method=S256` | Opened in the browser by the browser path. SoCLI does not request it |
 | `POST /oauth/token` | form: `grant_type=authorization_code`, `code`, `client_id`, `client_secret`, `redirect_uri`, `code_verifier`, `scope` | The browser path, after you paste the code |
 | `POST /oauth/revoke` | form: `client_id`, `client_secret`, `token` | `socli logout mastodon`, when the section holds a server, token and app |
 
 ## Pagination
 
-Mastodon lists carry a `Link` header with `rel="next"` and `rel="prev"` URLs, as the official pagination guide describes (read 2026-10-20). socli reads only the `next` URL and keeps one query pair from it as the cursor: `max_id=<id>` for timelines, bookmarks, notifications and account statuses, and `offset=<n>` for trends. The next request adds that pair. A bare number is read as a `max_id`, and any other key is ignored. Search does not use the header. It sends `offset` itself and offers a next page only when the answer filled the page.
+Mastodon lists carry a `Link` header with `rel="next"` and `rel="prev"` URLs, as the official pagination guide describes (read 2026-10-20). SoCLI reads only the `next` URL and keeps one query pair from it as the cursor: `max_id=<id>` for timelines, bookmarks, notifications and account statuses, and `offset=<n>` for trends. The next request adds that pair. A bare number is read as a `max_id`, and any other key is ignored. Search does not use the header. It sends `offset` itself and offers a next page only when the answer filled the page.
 
 ## Errors handled
 

@@ -1,6 +1,6 @@
 {
-  "name": "socli",
-  "short_name": "socli",
+  "name": "SoCLI",
+  "short_name": "SoCLI",
   "description": "A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon.",
   "start_url": "./",
   "scope": "./",

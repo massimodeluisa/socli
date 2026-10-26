@@ -107,7 +107,7 @@ export async function mountReader(container, options = {}) {
   style.textContent = css
   const root = document.createElement('div')
   root.className = 'soclib-reader'
-  root.innerHTML = '<div id="term" class="term"><div id="screen" class="screen" tabindex="0" role="application" aria-label="socli reader"><div id="grid" class="wasm-grid"></div></div></div><p id="live" class="soclib-live" aria-live="polite"></p>'
+  root.innerHTML = '<div id="term" class="term"><div id="screen" class="screen" tabindex="0" role="application" aria-label="SoCLI reader"><div id="grid" class="wasm-grid"></div></div></div><p id="live" class="soclib-live" aria-live="polite"></p>'
   shadow.append(style, root)
   container.append(host)
   const dark = () => {

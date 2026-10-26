@@ -1,6 +1,6 @@
 # Conventions
 
-This document holds the rules for working on the socli code, from the toolchain and the checks a change has to pass to the way commits and documentation are kept. Read it before you change code.
+This document holds the rules for working on the SoCLI code, from the toolchain and the checks a change has to pass to the way commits and documentation are kept. Read it before you change code.
 
 ## Scope and precedence
 
@@ -46,7 +46,7 @@ Every file in `src/` and every folder in `src/net/` has one row.
 | `chrome.rs` | The header, the sub-bar, the rules, the footer nav and the key hints, shared by the reader and `--print` |
 | `clip.rs` | Copying to the system clipboard, with OSC 52 as the fallback. The browser build remembers the text for the page |
 | `clock.rs` | Wall time and a monotonic instant. Native builds read the process clock. The browser build imports `socli_millis` and `socli_mono` |
-| `command.rs` | The grammar of the `socli>` command line, the same in the reader and the scrollback prompt |
+| `command.rs` | The grammar of the `SoCLI>` command line, the same in the reader and the scrollback prompt |
 | `config.rs` | The config file: sections, paths, modes, atomic writes, the keys `socli config` reads and writes. The browser build reads and writes the text the page stores |
 | `count.rs` | Post length the way x.com counts it (links 23, emoji 2) |
 | `demo.rs` | The offline fixture world with posts on all five networks |
@@ -62,7 +62,7 @@ Every file in `src/` and every folder in `src/net/` has one row.
 | `minimal.rs` | The minimal and plain detail levels: a network line beside each post instead of avatars and rails |
 | `fixtures.rs` | Test-only fixtures: the frozen clock, the demo state, post builders, and the grapheme and control-text samples |
 | `model.rs` | Posts, people, metrics and feeds as the reader sees them, and `Post::to_json` |
-| `plain.rs` | The scrollback printer behind `--print` and the `socli>` prompt |
+| `plain.rs` | The scrollback printer behind `--print` and the `SoCLI>` prompt |
 | `preview.rs` | The image picker facade. Native builds use `preview_native.rs`. The browser build does not fetch |
 | `preview_native.rs` | The image picker and the background loader for previews, avatars and inline images. Native builds only |
 | `render.rs` | The canvas, the post, thread and notification bodies, and the painting |
@@ -122,7 +122,7 @@ Application code returns `Result<_, String>`. The message starts in lowercase an
 no accounts yet. `socli login bluesky` (or x, devnull, threads, mastodon), or `socli --demo`.
 ```
 
-The network layer returns `NetError`, built with `thiserror`, whose variants carry the network and the text the user sees (sign-in required, unsupported on this network, an HTTP failure, a rate limit with its retry time, as in `Bluesky rate limit reached; try again in 3 minutes`). Code outside tests does not call `unwrap` or `expect`, except on an invariant that a comment documents. When a network rejects a request, socli shows the rejection with its context and never hides it.
+The network layer returns `NetError`, built with `thiserror`, whose variants carry the network and the text the user sees (sign-in required, unsupported on this network, an HTTP failure, a rate limit with its retry time, as in `Bluesky rate limit reached; try again in 3 minutes`). Code outside tests does not call `unwrap` or `expect`, except on an invariant that a comment documents. When a network rejects a request, SoCLI shows the rejection with its context and never hides it.
 
 The process exits with 0 on success, 1 when a network or target failed, and 2 for a usage error or a step that needs a person at a terminal. The reader exits with 130 on `ctrl-c`. The reader, the standalone composer and the secret prompt also arm the watchdog in `watchdog.rs`, because crossterm's read can spin forever on a terminal whose other end is gone. Two seconds after the first sign of trouble (SIGHUP, SIGTERM, a main loop that has not come round for five seconds, or, in the reader and the composer, stdout no longer a terminal), the watchdog exits with 143 after SIGTERM and with 129 otherwise. After a signal on a terminal that still answers, it first restores the reader's or the composer's screen the way `ctrl-c` does; in every other case it only turns raw mode off, so nothing is written to a terminal that may be gone. A loop that is still running saves the composer's text and exits on its own before then. Leaving the reader or the composer disarms the heartbeat and terminal checks, while the signals stay watched until the process ends. When errors are JSON (`--json`, or agent mode), `main.rs` prints one line on stderr, `{"error": "…"}`, and prints nothing on stdout. Clap's own usage errors add `usage` and `tip` fields to that line. A failed write still prints its JSON array on stdout and exits 1 with no stderr line.
 
@@ -144,7 +144,7 @@ Unit tests live in a `#[cfg(test)] mod tests` block next to the code they test. 
 
 ## Configuration and secrets
 
-socli reads its configuration from `$SOCLI_CONFIG_DIR/config.toml`, or from `$XDG_CONFIG_HOME/socli/config.toml` when `SOCLI_CONFIG_DIR` is not set, or from `~/.config/socli/config.toml` when neither is. It writes the file with mode `0600` and its directory with mode `0700`. Every write goes through `config::update`, which holds an exclusive lock on `config.toml.lock` while it loads the file, applies the change and replaces the file atomically, so a sign-in or a setting never leaves a half-written file and two socli processes never drop each other's change. Drafts follow the same rule through `drafts::update_at` and `drafts.json.lock`. An atomic write creates a new temporary file with mode `0600` beside the target, syncs it, renames it over the target and syncs the directory, and the lock files stay in place. Sign-in state lives in the network's own section (`[x]`, `[bluesky]`, `[devnull]`, `[threads]`), and the dev/null device key is a separate file in the config directory.
+SoCLI reads its configuration from `$SOCLI_CONFIG_DIR/config.toml`, or from `$XDG_CONFIG_HOME/socli/config.toml` when `SOCLI_CONFIG_DIR` is not set, or from `~/.config/socli/config.toml` when neither is. It writes the file with mode `0600` and its directory with mode `0700`. Every write goes through `config::update`, which holds an exclusive lock on `config.toml.lock` while it loads the file, applies the change and replaces the file atomically, so a sign-in or a setting never leaves a half-written file and two SoCLI processes never drop each other's change. Drafts follow the same rule through `drafts::update_at` and `drafts.json.lock`. An atomic write creates a new temporary file with mode `0600` beside the target, syncs it, renames it over the target and syncs the directory, and the lock files stay in place. Sign-in state lives in the network's own section (`[x]`, `[bluesky]`, `[devnull]`, `[threads]`), and the dev/null device key is a separate file in the config directory.
 
 Settings resolve in this order, first match wins:
 
@@ -185,7 +185,7 @@ Settings resolve in this order, first match wins:
 | Variable | What it does |
 | --- | --- |
 | `SOCLI_CONFIG_DIR` | The directory that holds `config.toml` and `drafts.json` |
-| `SOCLI_CACHE_DIR` | The image cache directory; without it socli uses `$XDG_CACHE_HOME/socli`, then `~/.cache/socli` |
+| `SOCLI_CACHE_DIR` | The image cache directory; without it SoCLI uses `$XDG_CACHE_HOME/socli`, then `~/.cache/socli` |
 | `SOCLI_AGENT` | `1` forces agent mode, `0` turns it off, anything else leaves detection on |
 | `SOCLI_NET` | Networks to read or post to when `--net` is absent |
 | `SOCLI_THEME` | A theme name (see `ui.theme`) when `--theme` is absent |
@@ -195,7 +195,7 @@ Settings resolve in this order, first match wins:
 | `SOCLI_MOUSE` | `on` or `off` when `--mouse` is absent |
 | `SOCLI_IMAGE` | `auto`, `kitty`, `iterm`, `sixel`, `blocks` or `off` when `--images` is absent |
 | `SOCLI_ICONS` | `auto`, `nerd` or `unicode` when `--icons` is absent |
-| `SOCLI_HYPERLINKS` | `1` turns OSC 8 hyperlinks on, `0` off; otherwise socli detects the terminal and keeps them off in tmux, screen and pipes |
+| `SOCLI_HYPERLINKS` | `1` turns OSC 8 hyperlinks on, `0` off; otherwise SoCLI detects the terminal and keeps them off in tmux, screen and pipes |
 | `SOCLI_TRUECOLOR` | `1` turns 24-bit color on, `0` off; otherwise `COLORTERM`, the terminal program and `TERM` decide |
 | `SOCLI_TRACE_FRAMES` | A file the reader appends one timing line to for every frame it draws (see [Performance](#performance)) |
 | `NO_COLOR` | Any value turns color off |
@@ -224,7 +224,7 @@ Every network lives in `src/net/<slug>/` behind the `Provider` trait in `src/net
 
 ## Commits
 
-[Releasing socli](RELEASING.md) describes version preparation, release tags, publishing destinations, and the required repository settings. Publishing runs only from release tags; branch and pull request workflows run checks.
+[Releasing SoCLI](RELEASING.md) describes version preparation, release tags, publishing destinations, and the required repository settings. Publishing runs only from release tags; branch and pull request workflows run checks.
 
 Commit messages follow English Conventional Commits with a subject line only: imperative mood, about 50 characters, no body, no co-author lines, and one of the prefixes `feat:`, `fix:` or `docs:`. If the repository gains a `CHANGELOG.md`, each change first adds one line in the past tense under `[Unreleased]`.
 

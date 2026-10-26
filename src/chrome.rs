@@ -179,7 +179,7 @@ pub fn header_targeted(state: &State, crumb: &str, width: usize) -> (StyledLine,
 }
 
 /**
-The header `--print` and the `socli>` prompt write: nothing in the scrollback takes keys, so it
+The header `--print` and the `SoCLI>` prompt write: nothing in the scrollback takes keys, so it
 never offers `⌫ back`.
 */
 pub fn printed_header(state: &State, crumb: &str, width: usize) -> StyledLine {
@@ -202,7 +202,7 @@ pub(crate) fn cut(text: &str, width: usize, ascii: bool) -> String {
 /// The crumb ends in `…` where it meets the account. When the account or `back` does not fit, `[...]` holds it.
 fn header_line(state: &State, crumb: &str, width: usize, keys: bool) -> (StyledLine, Vec<Target>) {
     let (mut canvas, y) = line(width);
-    let mut pieces = vec![(Kind::Bold, "socli".to_string())];
+    let mut pieces = vec![(Kind::Bold, "SoCLI".to_string())];
     for part in crumb.split(" › ") {
         pieces.push((Kind::Dim, " ›".into()));
         pieces.push((Kind::Fg, format!(" {part}")));
@@ -772,7 +772,7 @@ pub fn nav(state: &State, width: usize) -> StyledLine {
 /// `nav` and its targets: the sections and `[n] new post`.
 pub fn nav_targeted(state: &State, width: usize) -> (StyledLine, Vec<Target>) {
     let (mut canvas, y) = line(width);
-    let mut x = canvas.put(y, 0, Kind::Bold, "socli›") + 1;
+    let mut x = canvas.put(y, 0, Kind::Bold, "SoCLI›") + 1;
     let count = state.mention_count();
     let current = state.profile().is_none().then_some(state.section);
     for (i, section) in [Section::Home, Section::Notifications, Section::Search]
@@ -1380,7 +1380,7 @@ mod tests {
         let mut state = demo();
         state.icons = false;
         let header = header(&state, &state.crumb(), 104).plain();
-        assert!(header.starts_with("socli › all › home"), "{header}");
+        assert!(header.starts_with("SoCLI › all › home"), "{header}");
         assert!(header.trim_end().ends_with("Accounts   ⚑ 2"), "{header}");
         let (_, targets) = header_targeted(&state, &state.crumb(), 104);
         assert!(targets.iter().any(|target| target.act == Act::Accounts));
@@ -1392,7 +1392,7 @@ mod tests {
         assert!(targets
             .iter()
             .any(|target| target.act == Act::MyProfile(Network::X)));
-        assert!(nav(&state, 104).plain().starts_with("socli› [Home]"));
+        assert!(nav(&state, 104).plain().starts_with("SoCLI› [Home]"));
     }
 
     #[test]

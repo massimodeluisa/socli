@@ -1,6 +1,6 @@
 # Network integrations
 
-socli reads and writes five networks through one provider layer: X, Bluesky, dev/null, Threads and Mastodon. Each network sits behind the `Provider` trait in `src/net/mod.rs`, which turns its API into the shared `Post`, `User` and `Page` types, so the screens, the merged timeline and the commands never see a network-specific response. This page compares what the five networks can do, explains how ids, credentials and colors work across them, and describes what a new network has to provide. Reddit and Baidu Tieba are not integrated and have their own pages: [Reddit](reddit/README.md) and [Tieba](tieba/README.md).
+SoCLI reads and writes five networks through one provider layer: X, Bluesky, dev/null, Threads and Mastodon. Each network sits behind the `Provider` trait in `src/net/mod.rs`, which turns its API into the shared `Post`, `User` and `Page` types, so the screens, the merged timeline and the commands never see a network-specific response. This page compares what the five networks can do, explains how ids, credentials and colors work across them, and describes what a new network has to provide. Reddit and Baidu Tieba are not integrated and have their own pages: [Reddit](reddit/README.md) and [Tieba](tieba/README.md).
 
 Every network has a folder with five pages: `README.md` (capabilities, limits, status, sources), `auth.md`, `endpoints.md`, `mapping.md` and `testing.md`.
 
@@ -47,7 +47,7 @@ Some cells change with the sign-in state. These are the states the code distingu
 
 A reply needs the same capability as a post. An X quote on a browser session is native. An X quote on the official API, a Threads quote, and a Mastodon quote of another network's post are sent as your text followed by the link. A quote of a post on the same network is native where the API has one (see each network's mapping page). On Mastodon that holds for servers running 4.5 or newer, and an older server gets the link appended too.
 
-A feed name that a network lacks falls back where the code defines it: `latest` and `discover` open For you on X, and `discover` opens Trending on dev/null and on Mastodon. X has no trending feed in socli.
+A feed name that a network lacks falls back where the code defines it: `latest` and `discover` open For you on X, and `discover` opens Trending on dev/null and on Mastodon. X has no trending feed in SoCLI.
 
 Every network reports a rate limit with the same wording: "<network> rate limit reached; <wait>", with the network written as `X`, `Bluesky`, `Threads`, `dev/null` or `Mastodon` (for example "X rate limit reached; try again in 15 minutes"). The wait reads "try again in 45s" below 120 seconds, "try again in 15 minutes" from 120 seconds up (rounded up), and "try again in a minute" when the response gives no wait. X takes the wait from `x-rate-limit-reset` and falls back to `retry-after`, Threads takes it from `Retry-After`, and Mastodon takes it from `x-ratelimit-reset` (an ISO 8601 time) and falls back to `Retry-After`.
 
@@ -59,16 +59,16 @@ Every post id is scoped as `<slug>:<native id>`, for example `x:<id>`, `threads:
 - A link on `x.com` or `twitter.com` (with `www.` or `mobile.` removed) of the form `/<user>/status/<digits>` becomes `x:<digits>`.
 - A link `bsky.app/profile/<actor>/post/<rkey>` becomes `bluesky:at://<actor>/app.bsky.feed.post/<rkey>`.
 - A `dev-null.sh` link whose path contains `commits/<id>` becomes `devnull:<id>`.
-- A Mastodon link of the form `https://<server>/@<user>/<digits>`, `https://<server>/@<user>@<other>/<digits>` or `https://<server>/users/<user>/statuses/<digits>` becomes `mastodon:<link>`. The link stays the id because a status id is valid only on the server that issued it, and socli resolves it through search when the server is not yours (see [mastodon/mapping.md](mastodon/mapping.md)).
+- A Mastodon link of the form `https://<server>/@<user>/<digits>`, `https://<server>/@<user>@<other>/<digits>` or `https://<server>/users/<user>/statuses/<digits>` becomes `mastodon:<link>`. The link stays the id because a status id is valid only on the server that issued it, and SoCLI resolves it through search when the server is not yours (see [mastodon/mapping.md](mastodon/mapping.md)).
 - A link on `threads.net` or `threads.com` is refused: "Threads post links cannot be resolved through the API; use the id from `socli --json`".
-- Any other link fails with "socli cannot read <input>. use a post id, or a link from x.com, bsky.app, dev-null.sh or a Mastodon server".
-- A bare id uses the network from a single `--net`, the selected scope, or `default_network`. When none applies, socli asks "which network? add --net x|bluesky|devnull|threads|mastodon, or use a full id like bluesky:at://…".
+- Any other link fails with "SoCLI cannot read <input>. use a post id, or a link from x.com, bsky.app, dev-null.sh or a Mastodon server".
+- A bare id uses the network from a single `--net`, the selected scope, or `default_network`. When none applies, SoCLI asks "which network? add --net x|bluesky|devnull|threads|mastodon, or use a full id like bluesky:at://…".
 
 `--net` takes one slug, a comma list or `all`. It accepts the aliases `twitter`, `bsky`, `dev/null`, `dev-null` and `masto`. The `SOCLI_NET` environment variable sets the default, and `default_network` in the configuration does the same when it is unset.
 
 ## Credentials and configuration
 
-socli reads `config.toml` from `$SOCLI_CONFIG_DIR`, else `$XDG_CONFIG_HOME/socli`, else `~/.config/socli`. The file is written with mode 0600 in a 0700 directory, and writes are atomic. Each network has one section. The X and Threads variables override the stored values, and the Bluesky variables are inputs to `socli login bluesky`, and the Mastodon variables work both ways: they are inputs to `socli login mastodon` and they override the stored values at run time.
+SoCLI reads `config.toml` from `$SOCLI_CONFIG_DIR`, else `$XDG_CONFIG_HOME/socli`, else `~/.config/socli`. The file is written with mode 0600 in a 0700 directory, and writes are atomic. Each network has one section. The X and Threads variables override the stored values, and the Bluesky variables are inputs to `socli login bluesky`, and the Mastodon variables work both ways: they are inputs to `socli login mastodon` and they override the stored values at run time.
 
 | Network | Section keys | Environment variables | Sign in |
 | --- | --- | --- | --- |

@@ -1,12 +1,12 @@
 # X endpoints
 
-A browser session (`socli login x`, or `X_AUTH_TOKEN` together with `X_CT0`) talks to the same GraphQL the website uses, `https://x.com/i/api/graphql/{queryId}/{Operation}`, from `src/net/x/web.rs`. Query ids are read from the current `main.*.js` and cached in `x-ops.json` for six hours. HomeTimeline, HomeLatestTimeline and Bookmarks are no longer named in that bundle; socli keeps the persisted query ids that still answer. SearchTimeline is a POST. Follow and unfollow are `POST https://x.com/i/api/1.1/friendships/create.json` and `destroy.json`. A quote is a post whose `attachment_url` is `https://x.com/i/status/{id}`.
+A browser session (`socli login x`, or `X_AUTH_TOKEN` together with `X_CT0`) talks to the same GraphQL the website uses, `https://x.com/i/api/graphql/{queryId}/{Operation}`, from `src/net/x/web.rs`. Query ids are read from the current `main.*.js` and cached in `x-ops.json` for six hours. HomeTimeline, HomeLatestTimeline and Bookmarks are no longer named in that bundle; SoCLI keeps the persisted query ids that still answer. SearchTimeline is a POST. Follow and unfollow are `POST https://x.com/i/api/1.1/friendships/create.json` and `destroy.json`. A quote is a post whose `attachment_url` is `https://x.com/i/status/{id}`.
 
 The tables below are the official API v2 at `https://api.x.com`, used when the session is an OAuth user token or an app bearer (`src/net/x/client.rs`, `src/net/x/auth.rs`). Every official call sends the token as an `Authorization: Bearer` header. Reads use the user token when one is stored and the app bearer otherwise. Writes need the user token. A stored browser session is preferred over both.
 
 Back to [X](README.md). Related: [auth](auth.md), [mapping](mapping.md), [testing](testing.md).
 
-## Fields socli requests
+## Fields SoCLI requests
 
 Timeline, search and lookup calls share one set of fields, so a post arrives with its author, media and referenced posts in a single response:
 
@@ -21,7 +21,7 @@ The tables name them "the post fields" below. Page sizes are clamped to the rang
 
 ## Reads
 
-| Method and path | Parameters socli sends | Triggered by | Pagination |
+| Method and path | Parameters SoCLI sends | Triggered by | Pagination |
 | --- | --- | --- | --- |
 | `GET /2/users/me` | `user.fields` | sign-in, and any call that needs your user id when it is not stored | none |
 | `GET /2/users/by/username/{username}` | `user.fields` | `socli user @handle`, the author screen (`u` in the reader) | none |
@@ -34,7 +34,7 @@ The tables name them "the post fields" below. Page sizes are clamped to the rang
 
 `{id}` is your own user id for the timeline, bookmarks and mentions calls, and the profile's user id for `/tweets`.
 
-`socli thread` issues the root lookup and the conversation search together. When only one of them succeeds socli shows what it has: the root alone if the search fails, the replies alone if the root fails and the search returned posts. It fails only when both fail, or when the root fails and the search is empty.
+`socli thread` issues the root lookup and the conversation search together. When only one of them succeeds SoCLI shows what it has: the root alone if the search fails, the replies alone if the root fails and the search returned posts. It fails only when both fail, or when the root fails and the search is empty.
 
 ## Writes
 
@@ -47,7 +47,7 @@ The tables name them "the post fields" below. Page sizes are clamped to the rang
 | `POST /2/users/{id}/bookmarks` and `DELETE /2/users/{id}/bookmarks/{tweet_id}` | `{"tweet_id": ...}` for the POST | `socli bookmark`, `socli unbookmark` |
 | `POST /2/users/{id}/following` and `DELETE /2/users/{id}/following/{target_user_id}` | `{"target_user_id": ...}` for the POST | `socli follow`, `socli unfollow` |
 
-socli never sends `quote_tweet_id`. The create-post page says quote posting needs an Enterprise plan (checked 2026-10-20). After a post succeeds socli builds the permalink `https://x.com/{username}/status/{id}` from your stored username (`i` when none is stored).
+SoCLI never sends `quote_tweet_id`. The create-post page says quote posting needs an Enterprise plan (checked 2026-10-20). After a post succeeds SoCLI builds the permalink `https://x.com/{username}/status/{id}` from your stored username (`i` when none is stored).
 
 ## Authentication endpoints
 
@@ -59,7 +59,7 @@ socli never sends `quote_tweet_id`. The create-post page says quote posting need
 
 ## Errors
 
-Every failed call becomes an error whose first line is the best message found in the response: the `message` or `detail` of the `errors` array, else `detail`, else `title`, else "X API returned {status}" followed by the body cut to 280 characters. socli then appends one hint line for these cases:
+Every failed call becomes an error whose first line is the best message found in the response: the `message` or `detail` of the `errors` array, else `detail`, else `title`, else "X API returned {status}" followed by the body cut to 280 characters. SoCLI then appends one hint line for these cases:
 
 | Status | Hint |
 | --- | --- |
@@ -70,4 +70,4 @@ Every failed call becomes an error whose first line is the best message found in
 | 403 on a reply | Self-serve replies are often rejected unless that author has @mentioned or quoted you. |
 | 429 | "X rate limit reached; try again in 15 minutes", "in 45s" below two minutes, or "in a minute" when no header gives a wait |
 
-socli does not retry on 429. It reads the wait from `x-rate-limit-reset` (a Unix time) and falls back to `retry-after`; the other `x-rate-limit-*` headers (`x-rate-limit-limit`, `x-rate-limit-remaining`) are not read.
+SoCLI does not retry on 429. It reads the wait from `x-rate-limit-reset` (a Unix time) and falls back to `retry-after`; the other `x-rate-limit-*` headers (`x-rate-limit-limit`, `x-rate-limit-remaining`) are not read.

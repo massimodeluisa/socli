@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
-const FULL = 'Social CLI'
+const FULL = 'SoCLI'
 const KEEP = 'So'
 const TAIL = FULL.slice(KEEP.length)
 
@@ -120,7 +120,7 @@ onBeforeUnmount(() => {
   <p
     class="so-mark"
     role="img"
-    aria-label="socli"
+    aria-label="SoCLI"
     @mouseenter="onEnter"
     @mouseleave="onLeave"
   >

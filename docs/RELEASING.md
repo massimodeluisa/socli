@@ -1,6 +1,6 @@
-# Releasing socli
+# Releasing SoCLI
 
-Pushing a release tag is the only event that publishes socli. A manual Release workflow run verifies the current source and builds artifacts without publishing. `.github/workflows/release.yml` builds the tagged commit, publishes its GitHub release and npm packages, updates a Homebrew tap when configured, and deploys the website. Branch pushes and pull requests run `.github/workflows/ci.yml` without publishing. The web workflow is reusable and has no branch, tag, or manual trigger of its own.
+Pushing a release tag is the only event that publishes SoCLI. A manual Release workflow run verifies the current source and builds artifacts without publishing. `.github/workflows/release.yml` builds the tagged commit, publishes its GitHub release and npm packages, updates a Homebrew tap when configured, and deploys the website. Branch pushes and pull requests run `.github/workflows/ci.yml` without publishing. The web workflow is reusable and has no branch, tag, or manual trigger of its own.
 
 ## Release outputs
 
@@ -86,8 +86,8 @@ Debian, RPM, and Alpine packages are published as GitHub release assets. Users c
 
 ## Why this workflow
 
-[ripgrep's release workflow](https://github.com/BurntSushi/ripgrep/blob/master/.github/workflows/release.yml) demonstrates tag-only releases, manifest checks, a target matrix, `cross`, archives, and Debian packages. [bat's workflow](https://github.com/sharkdp/bat/blob/master/.github/workflows/CICD.yml) combines branch CI with a release gate and packages builds for several architectures. socli separates CI from publishing so the events that can publish remain explicit.
+[ripgrep's release workflow](https://github.com/BurntSushi/ripgrep/blob/master/.github/workflows/release.yml) demonstrates tag-only releases, manifest checks, a target matrix, `cross`, archives, and Debian packages. [bat's workflow](https://github.com/sharkdp/bat/blob/master/.github/workflows/CICD.yml) combines branch CI with a release gate and packages builds for several architectures. SoCLI separates CI from publishing so the events that can publish remain explicit.
 
-[cargo-dist](https://github.com/axodotdev/cargo-dist) can generate a release pipeline with npm and Homebrew installers. It is useful when its generated installers and target support match the project. socli currently uses an explicit matrix because the release also includes two 32-bit Linux targets, Linux package formats, and a browser engine that shares the website build. [nFPM](https://github.com/goreleaser/nfpm/blob/main/www/content/docs/configuration.md) packages the existing Linux executables without rebuilding them.
+[cargo-dist](https://github.com/axodotdev/cargo-dist) can generate a release pipeline with npm and Homebrew installers. It is useful when its generated installers and target support match the project. SoCLI currently uses an explicit matrix because the release also includes two 32-bit Linux targets, Linux package formats, and a browser engine that shares the website build. [nFPM](https://github.com/goreleaser/nfpm/blob/main/www/content/docs/configuration.md) packages the existing Linux executables without rebuilding them.
 
 A release-preparation tool such as [release-plz](https://release-plz.dev/) could later prepare version and changelog pull requests. Tag creation would still be the publishing boundary. Until then, version preparation is reviewed on `main`, and the workflow checks that each destination receives the tagged version.

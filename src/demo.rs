@@ -178,7 +178,7 @@ pub fn world(now: DateTime<Utc>) -> DemoWorld {
             short: "https://example.com/socli".into(),
             expanded: "https://example.com/socli".into(),
             display: "example.com/socli".into(),
-            title: Some("socli".into()),
+            title: Some("SoCLI".into()),
             description: Some(
                 "A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon"
                     .into(),

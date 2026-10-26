@@ -587,7 +587,7 @@ fn parse_link(input: &str) -> Result<String, String> {
         .map(|s| s.filter(|p| !p.is_empty()).collect())
         .unwrap_or_default();
     let unknown = || {
-        format!("socli cannot read {input}. use a post id, or a link from x.com, bsky.app, dev-null.sh or a Mastodon server")
+        format!("SoCLI cannot read {input}. use a post id, or a link from x.com, bsky.app, dev-null.sh or a Mastodon server")
     };
     match host {
         "x.com" | "twitter.com" => match parts.as_slice() {

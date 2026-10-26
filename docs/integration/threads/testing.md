@@ -1,6 +1,6 @@
 # Testing Threads
 
-Every call to the Threads API needs a token for a Meta app, so what socli can check without an account is limited. The demo mode shows the screens and the limits, the dry run shows what a post would do, and the unit tests run against JSON files stored under `src/net/threads/fixtures/`. The OAuth exchanges, the container flow and the permission rules are checked only with a real account.
+Every call to the Threads API needs a token for a Meta app, so what SoCLI can check without an account is limited. The demo mode shows the screens and the limits, the dry run shows what a post would do, and the unit tests run against JSON files stored under `src/net/threads/fixtures/`. The OAuth exchanges, the container flow and the permission rules are checked only with a real account.
 
 Back to [Threads](README.md). Related: [auth](auth.md), [endpoints](endpoints.md), [mapping](mapping.md).
 
@@ -47,10 +47,10 @@ Remove the directory when you are done: `rm -r "$D"`.
 
 These steps need a Meta app with the Threads use case and a Threads account that can use it. See [auth](auth.md) for the token. Posts you publish are real posts, so delete the test ones.
 
-1. Sign in with a token: `socli login threads --token <token> --app-secret <secret>`. socli prints the account and "token valid until YYYY-MM-DD". Without `--app-secret` it prints "token lifetime unknown; add --app-secret to swap it for a 60-day token that renews itself" instead. A wrong token fails at the `GET /me` check.
+1. Sign in with a token: `socli login threads --token <token> --app-secret <secret>`. SoCLI prints the account and "token valid until YYYY-MM-DD". Without `--app-secret` it prints "token lifetime unknown; add --app-secret to swap it for a 60-day token that renews itself" instead. A wrong token fails at the `GET /me` check.
 2. Check what was stored: `socli auth status` (the token shows `set` or its last four characters) and `socli whoami`.
 3. Read: `socli feed mine --net threads --print`, `socli notifications --net threads --print`, `socli search rust --net threads --print`, `socli thread <id> --print`, and `socli user @<your handle> --net threads --print`. A search before Meta approves `threads_keyword_search` shows only your own posts. `socli user @<someone else> --net threads` fails with "threads has no profiles of other accounts in its API".
-4. Write and clean up: `socli post "test" --net threads`, then `socli reply <id> "test" --net threads`, then `socli repost <other id> --net threads`, then `socli delete <id> --net threads` for each test post. socli cannot undo the repost, so pick a post you do not mind reposting.
+4. Write and clean up: `socli post "test" --net threads`, then `socli reply <id> "test" --net threads`, then `socli repost <other id> --net threads`, then `socli delete <id> --net threads` for each test post. SoCLI cannot undo the repost, so pick a post you do not mind reposting.
 5. Quote: `socli quote <id> "text" --net threads` posts a native quote.
 6. Limits: a post of 501 characters, an empty post and a post with six distinct links must each fail before any request (`--dry-run` shows the length without sending).
 7. Refresh: `socli auth threads refresh` works once the token is at least a day old.
@@ -84,4 +84,4 @@ Shared tests that touch Threads: `src/net/mod.rs` has `targets_explain_what_they
 
 ## What needs an account
 
-The OAuth and token calls, the container status flow before publish, the effect of Meta's app review (search scope, publishing for non-testers), the real response of `GET /me/mentions` and the conversation endpoint, rate-limit codes in production and token refresh after a day. The fixtures show that socli parses the shapes written into them, not that Meta still returns those shapes.
+The OAuth and token calls, the container status flow before publish, the effect of Meta's app review (search scope, publishing for non-testers), the real response of `GET /me/mentions` and the conversation endpoint, rate-limit codes in production and token refresh after a day. The fixtures show that SoCLI parses the shapes written into them, not that Meta still returns those shapes.

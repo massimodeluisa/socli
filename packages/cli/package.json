@@ -1,6 +1,6 @@
 {
   "name": "soclish",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon",
   "type": "module",
   "license": "MIT",

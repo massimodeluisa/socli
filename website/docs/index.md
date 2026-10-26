@@ -1,11 +1,11 @@
 ---
 title: Quick start
-description: What socli is, and how to install it, open the demo, sign in and post.
+description: What SoCLI is, and how to install it, open the demo, sign in and post.
 ---
 
 # Quick start
 
-socli reads X, Bluesky, dev/null, Threads and Mastodon in one full-screen terminal reader. Signed in to more than one network, it merges their home timelines into a single list of posts, and `--net` narrows the reader to one network or a comma list. `socli --demo` opens the same reader with an offline feed, before any account exists.
+SoCLI reads X, Bluesky, dev/null, Threads and Mastodon in one full-screen terminal reader. Signed in to more than one network, it merges their home timelines into a single list of posts, and `--net` narrows the reader to one network or a comma list. `socli --demo` opens the same reader with an offline feed, before any account exists.
 
 ## Install
 

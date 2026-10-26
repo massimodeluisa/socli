@@ -1,6 +1,6 @@
 ---
 title: CLI commands
-description: Run socli from the shell with direct commands, positional arguments, options, stdin and JSON output.
+description: Run SoCLI from the shell with direct commands, positional arguments, options, stdin and JSON output.
 ---
 
 # CLI commands
@@ -27,7 +27,7 @@ socli post "hello from the terminal" --demo --net x,bluesky --dry-run --json
 | Invocation | Behavior |
 | --- | --- |
 | `socli` or a read command at a terminal | Open the TUI. Without an account, bare `socli` opens the sign-in screen. |
-| `socli --print` | Print the feed, then open the `socli>` prompt when both input and output are terminals. |
+| `socli --print` | Print the feed, then open the `SoCLI>` prompt when both input and output are terminals. |
 | `socli --print --no-prompt` | Print the feed once and exit. |
 | `socli --json` | Print the feed as a JSON array and exit. |
 | `socli feed --json` | Print a read command's posts as a JSON array and exit. |
@@ -41,7 +41,7 @@ Coding agents get JSON by default and never open prompts. `--print` selects text
 
 For reads, scope comes from `--net`, then `SOCLI_NET`, then `feed.networks` in the configuration, then the available signed-in networks. Public search, profile and thread reads can use an explicitly named network without a session where its API allows it; [Networks](networks.html) lists the restrictions.
 
-For `post`, `--net` or `SOCLI_NET` chooses the destinations. Without either, socli uses the default set by `socli auth default`, or the only signed-in network that can post. With several possible destinations and no default, the command asks you to specify `--net`. `--net all` posts to every signed-in network that can publish. The reader's `feed.networks` filter does not choose posting destinations.
+For `post`, `--net` or `SOCLI_NET` chooses the destinations. Without either, SoCLI uses the default set by `socli auth default`, or the only signed-in network that can post. With several possible destinations and no default, the command asks you to specify `--net`. `--net all` posts to every signed-in network that can publish. The reader's `feed.networks` filter does not choose posting destinations.
 
 A post target is the `id` from a JSON read, in the form `<network>:<native-id>`. Supported post URLs from X, Bluesky, dev/null and Mastodon also work. Threads requires the JSON `id` because its API cannot resolve post URLs. For a bare native id, specify one network with `--net`, or configure a default. `view` requires a scoped id or post URL when targeting a post.
 
@@ -184,7 +184,7 @@ These options are accepted before or after the command. They apply to the releva
 | --- | --- |
 | `--json` | Print JSON. Read results are arrays of posts; writes are arrays of per-network results. |
 | `--print` | Use scrollback text for reads instead of the TUI. |
-| `--no-prompt` | Suppress the `socli>` prompt after printing. |
+| `--no-prompt` | Suppress the `SoCLI>` prompt after printing. |
 | `--demo` | Use the offline feed and simulate post actions. |
 | `--net <list>` | Select networks; see [Networks and targets](#networks-and-targets). |
 | `--count <n>` | Request this many posts per network; default `15`. The argument is an integer from `0` to `255`; providers can impose other limits. |
@@ -217,7 +217,7 @@ socli completions zsh
 
 ## In-reader commands
 
-The TUI command palette (`:` or `ctrl-k`) and the scrollback `socli>` prompt share an interactive grammar. Enter commands without the `socli` prefix. Use `net bluesky` to change scope, `following` to pick a feed and post numbers or the selection for actions. Shell options such as `--net`, `--json` and `--raw` are not parsed here, and quotes are treated as text rather than shell delimiters.
+The TUI command palette (`:` or `ctrl-k`) and the scrollback `SoCLI>` prompt share an interactive grammar. Enter commands without the `socli` prefix. Use `net bluesky` to change scope, `following` to pick a feed and post numbers or the selection for actions. Shell options such as `--net`, `--json` and `--raw` are not parsed here, and quotes are treated as text rather than shell delimiters.
 
 ```text
 net bluesky
@@ -240,7 +240,7 @@ reply 2 agreed
 | `open [number]`, `view [number]`, `avatar [number]`, `json [number]`, `share [number]` | Open the post's link or images, view its avatar, inspect it or copy its link. |
 | `filter [words]`, `clear` | Filter posts already loaded, or clear that filter. |
 | `theme [name]` | Open the theme picker in the TUI, or apply a named theme. |
-| `help`, `quit` | Show interactive help or leave socli. |
+| `help`, `quit` | Show interactive help or leave SoCLI. |
 
 Interactive post numbers start at 1. They are positions in the current list, not the scoped ids used by the shell CLI. `help` in the TUI opens the key reference; `help` in the scrollback prompt lists interactive commands. The scrollback prompt requires `theme <name>` and applies it only to the running session. In the TUI, `:theme <name>` also saves the choice. [Keys](keys.html) covers the keyboard controls.
 

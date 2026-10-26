@@ -1,4 +1,4 @@
-//! Commits, users and pages as the API returns them, and how they become socli posts.
+//! Commits, users and pages as the API returns them, and how they become SoCLI posts.
 
 use std::collections::HashMap;
 

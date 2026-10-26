@@ -49,7 +49,7 @@ struct Cli {
     /// Check a write against sign-in, caps and limits without sending it.
     #[arg(long, global = true)]
     dry_run: bool,
-    /// Do not open the `socli>` prompt after printing.
+    /// Do not open the `SoCLI>` prompt after printing.
     #[arg(long, global = true)]
     no_prompt: bool,
     /// Paint post images inline: auto, kitty, iterm, sixel, blocks, or off, as `--images=blocks`. Auto when given alone.

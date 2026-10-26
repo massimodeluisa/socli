@@ -6,6 +6,10 @@ The terminal cannot register an http://127.0.0.1 redirect with Meta, so its auth
 redirect is https://socli.sh/. A state that starts with x. or th. plus 64 characters
 is the terminal, and this Worker sends the browser on to the loopback the process
 is already listening on. A page sign-in uses a state without that prefix and stays here.
+A Tufty badge cannot register its LAN address either. Its state is xb. plus 8 hex
+chars of a private IPv4 plus 64 characters, and this Worker sends the phone to
+http://that-address:8080/x/callback. Any other xb. state is dropped, so the code
+is not an open redirect.
 Privacy, terms, and data deletion are the pages bundled in this Worker. The reader,
 its wasm, and the docs are static assets. The homepage is the built site when those
 assets are bound, and the bundled page when they are not. Anything else is passed
@@ -22,16 +26,12 @@ const LOOPBACK = {
 
 /** Terminal state is `x.` or `th.` plus a 64-character verifier. A page state is 64 characters with no prefix, so a page state that happens to start with `x.` or `th.` is shorter after that prefix and stays on the page. */
 const CLI_STATE = /^(x|th)\.[A-Za-z0-9._~-]{64}$/
+/** Badge state is `xb.` plus the private IPv4 in hex plus a 64-character nonce. `x.` is the terminal, so this must not match that. */
+const BADGE_STATE = /^xb\.([0-9a-f]{8})\.([A-Za-z0-9._~-]{64})$/
 const CLI_CODE = /^[A-Za-z0-9._~+/-]{1,512}$/
 const CLI_ERROR = /^[A-Za-z0-9_]{1,64}$/
 
-/** The terminal's loopback, or null when this request is an ordinary page visit. */
-export function cliLoopback(url) {
-  if (url.pathname !== "/" && url.pathname !== "/index.html") return null
-  const state = url.searchParams.get("state") || ""
-  const match = CLI_STATE.exec(state)
-  if (!match) return null
-  const target = new URL(LOOPBACK[match[1]])
+function oauthTarget(url, target) {
   const code = url.searchParams.get("code")
   const error = url.searchParams.get("error")
   if (code && CLI_CODE.test(code)) target.searchParams.set("code", code)
@@ -42,8 +42,48 @@ export function cliLoopback(url) {
       target.searchParams.set("error_description", desc)
     }
   } else return null
-  target.searchParams.set("state", state)
+  target.searchParams.set("state", url.searchParams.get("state") || "")
   return target.toString()
+}
+
+/** The terminal's loopback, or null when this request is an ordinary page visit. */
+export function cliLoopback(url) {
+  if (url.pathname !== "/" && url.pathname !== "/index.html") return null
+  const state = url.searchParams.get("state") || ""
+  const match = CLI_STATE.exec(state)
+  if (!match) return null
+  return oauthTarget(url, new URL(LOOPBACK[match[1]]))
+}
+
+/** A private IPv4 from 8 hex chars, or null. Loopback, public and CGNAT addresses are not private here. */
+export function badgeHost(hex) {
+  if (!/^[0-9a-f]{8}$/.test(hex)) return null
+  const bytes = [0, 1, 2, 3].map((i) => Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16))
+  const [a, b] = bytes
+  const priv =
+    a === 10 ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254)
+  if (!priv) return null
+  return bytes.join(".")
+}
+
+/**
+The badge's sign-in callback, "drop" when the state is shaped like a badge
+state but must not be forwarded, or null for an ordinary visit.
+Port 8080 is the badge's sign-in port. The address comes only from the hex
+in the state, so the redirect cannot point at an arbitrary host.
+*/
+export function badgeLoopback(url) {
+  if (url.pathname !== "/" && url.pathname !== "/index.html") return null
+  const state = url.searchParams.get("state") || ""
+  const match = BADGE_STATE.exec(state)
+  if (!match) return null
+  const host = badgeHost(match[1])
+  if (!host) return "drop"
+  const forwarded = oauthTarget(url, new URL(`http://${host}:8080/x/callback`))
+  return forwarded || "drop"
 }
 
 const PAGES = new Map([
@@ -60,9 +100,23 @@ const PAGES = new Map([
 const SECURITY = {
   "content-security-policy":
     "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
   "cache-control": "no-store",
+}
+
+const HSTS = "max-age=31536000; includeSubDomains"
+
+/** Adds HSTS without the legal-page policy. Asset responses keep their own content type. */
+function stamp(response) {
+  const headers = new Headers(response.headers)
+  if (!headers.has("strict-transport-security")) headers.set("strict-transport-security", HSTS)
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
 }
 
 export function fallbackHtml(pathname) {
@@ -188,28 +242,30 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url)
     if (request.method === "GET" || request.method === "HEAD") {
-      const loop = cliLoopback(url)
+      const loop = cliLoopback(url) || badgeLoopback(url)
       if (loop) {
-        return new Response(null, {
-          status: 302,
-          headers: {
-            location: loop,
-            "cache-control": "no-store",
-            "referrer-policy": "no-referrer",
-          },
-        })
+        return stamp(
+          new Response(null, {
+            status: 302,
+            headers: {
+              location: loop === "drop" ? "https://socli.sh/" : loop,
+              "cache-control": "no-store",
+              "referrer-policy": "no-referrer",
+            },
+          }),
+        )
       }
     }
     const relayed = await forwardRelay(request, url)
-    if (relayed) return relayed
+    if (relayed) return stamp(relayed)
     const html = fallbackHtml(url.pathname)
     const home = url.pathname === "/" || url.pathname === "/index.html"
     if (html && !home) return page(request, html)
     const asset = await serveAsset(request, env, url)
-    if (asset) return asset
+    if (asset) return stamp(asset)
     if (html) return page(request, html)
     const origin = await passOrigin(request)
-    if (origin) return origin
+    if (origin) return stamp(origin)
     return text("not found", 404)
   },
 }

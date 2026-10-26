@@ -53,12 +53,12 @@ const rewriteWeb: ReaderRewrite = (req, _res, next) => {
 }
 
 const ogImageAlt =
-  "socli: the words Read. Reply. Post. beside the socli reader in a terminal window, where the selected post shows two photos: an ocean wave and Lisbon's 25 de Abril Bridge at sunset."
+  "SoCLI: the words Read. Reply. Post. beside the SoCLI reader in a terminal window, where the selected post shows two photos: an ocean wave and Lisbon's 25 de Abril Bridge at sunset."
 
 export default defineConfig({
   lang: 'en',
-  title: 'socli',
-  titleTemplate: ':title · socli',
+  title: 'SoCLI',
+  titleTemplate: ':title · SoCLI',
   description,
   base,
   cleanUrls: false,
@@ -80,7 +80,7 @@ export default defineConfig({
     ['link', { rel: 'apple-touch-icon', href: base + 'apple-touch-icon.png' }],
     ['link', { rel: 'manifest', href: base + 'site.webmanifest' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:site_name', content: 'socli' }],
+    ['meta', { property: 'og:site_name', content: 'SoCLI' }],
     ['meta', { property: 'og:image', content: origin + base + 'og.png' }],
     ['meta', { property: 'og:image:width', content: '1200' }],
     ['meta', { property: 'og:image:height', content: '630' }],
@@ -94,13 +94,19 @@ export default defineConfig({
       JSON.stringify({
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
-        name: 'socli',
+        name: 'SoCLI',
         applicationCategory: 'SocialNetworkingApplication',
         operatingSystem: 'macOS, Linux',
         url: origin + base,
         description,
         image: origin + base + 'og.png',
         logo: origin + base + 'icon-512.png',
+        dateModified: '2026-10-25',
+        author: {
+          '@type': 'Person',
+          name: 'Massimo De Luisa',
+          url: 'https://github.com/massimodeluisa',
+        },
       }),
     ],
   ],
@@ -114,7 +120,7 @@ export default defineConfig({
     head.push(
       ['link', { rel: 'canonical', href: url }],
       ['meta', { property: 'og:url', content: url }],
-      ['meta', { property: 'og:title', content: pageData.title || 'socli' }],
+      ['meta', { property: 'og:title', content: pageData.title || 'SoCLI' }],
       ['meta', { property: 'og:description', content: pageData.description || description }],
     )
   },
@@ -126,10 +132,10 @@ export default defineConfig({
       webReaderRoute(),
       xRelay(base),
       llmstxt({
-        title: 'socli',
+        title: 'SoCLI',
         description,
         details:
-          'socli is a Rust terminal client. Agents should run it with --json or --print, never the full-screen reader. Docs: ' +
+          'SoCLI is a Rust terminal client. Agents should run it with --json or --print, never the full-screen reader. Docs: ' +
           origin +
           base +
           'docs/',
@@ -156,7 +162,7 @@ export default defineConfig({
         ],
       },
       {
-        label: 'using socli',
+        label: 'using SoCLI',
         items: [
           { text: 'Reader', link: '/docs/reader.html' },
           { text: 'Keys', link: '/docs/keys.html' },
