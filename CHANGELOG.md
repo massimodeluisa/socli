@@ -4,6 +4,7 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Fixed the light logo so the off frame keeps an opaque tile.
 - Returned the one-hour Threads token when the 60-day swap fails, and included Meta's error code on a failed code exchange.
 
 ## [0.1.2] - 2026-10-26
