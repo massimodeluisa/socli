@@ -46,6 +46,11 @@ if (import.meta.main) {
       console.log(`already published: ${specifier}`)
       continue
     }
-    execFileSync('npm', ['publish', item.path, '--access', 'public', '--tag', tag], { stdio: 'inherit' })
+    const published = spawnSync('npm', ['publish', item.path, '--access', 'public', '--tag', tag], { encoding: 'utf8' })
+    if (published.error) throw published.error
+    if (published.status !== 0) {
+      const detail = [published.stderr, published.stdout].filter(Boolean).join('\n').trim()
+      throw new Error(`npm publish failed for ${specifier} (status ${published.status ?? 'unknown'})${detail ? `: ${detail}` : ''}`)
+    }
   }
 }
