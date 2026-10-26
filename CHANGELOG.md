@@ -4,6 +4,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Wrote mouse-off sequences to the terminal instead of restoring a Windows console mode, and tested cookie permission errors by kind.
+
 - Named the published npm packages in the contributor docs.
 
 - Included npm's own error text when publication fails.

@@ -533,7 +533,11 @@ mod tests {
 
     #[test]
     fn a_blocked_browser_is_not_reported_as_no_session() {
-        let err = read_error("Brave", &std::io::Error::from_raw_os_error(1));
+        // os error 1 is EPERM on Unix and "Incorrect function" on Windows. The branch keys off the kind.
+        let err = read_error(
+            "Brave",
+            &std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"),
+        );
         assert!(err.contains("Full Disk Access"), "{err}");
         assert!(!err.contains("no X session"), "{err}");
         let missing = browser_present(std::path::Path::new("/no/such/socli-browser-root")).unwrap();

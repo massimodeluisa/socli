@@ -21,9 +21,8 @@ use crate::key::{
 };
 #[cfg(feature = "native")]
 use crossterm::event::{
-    self, DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
-    EnableFocusChange, Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
-    PushKeyboardEnhancementFlags,
+    self, DisableBracketedPaste, DisableFocusChange, EnableBracketedPaste, EnableFocusChange,
+    Event, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 #[cfg(feature = "native")]
 use crossterm::execute;
@@ -876,7 +875,8 @@ fn report_modes(
             out.write_all(b"\x1b[?1000h\x1b[?1002h\x1b[?1006h")?;
         } else {
             hover_on.store(false, Ordering::Relaxed);
-            execute!(out, DisableMouseCapture)?;
+            // Windows DisableMouseCapture calls WinAPI and needs a mode EnableMouseCapture saved.
+            out.write_all(b"\x1b[?1006l\x1b[?1015l\x1b[?1003l\x1b[?1002l\x1b[?1000l")?;
         }
     }
     if hover_on.swap(hover, Ordering::Relaxed) != hover {
