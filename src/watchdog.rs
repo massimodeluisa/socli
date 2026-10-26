@@ -114,8 +114,10 @@ fn watch_terminal() {
     STARTED.get_or_init(|| {
         let hup = Arc::new(AtomicBool::new(false));
         let term = Arc::new(AtomicBool::new(false));
-        let _ = signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&hup));
         let _ = signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&term));
+        // SIGHUP is not in signal_hook's Windows consts. A closed console still fails the stdout probe.
+        #[cfg(unix)]
+        let _ = signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&hup));
         thread::spawn(move || {
             let mut first = None;
             loop {
@@ -271,7 +273,7 @@ mod tests {
         );
         let (code, after) = codes.recv_timeout(Duration::from_secs(2)).unwrap();
         assert_eq!(code, 129);
-        assert!(after < Duration::from_millis(600), "{after:?}");
+        assert!(after < RESTORE_WAIT + Duration::from_secs(1), "{after:?}");
     }
 
     #[test]

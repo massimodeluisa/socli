@@ -1246,9 +1246,12 @@ pub fn run(mut state: State, mut clients: Clients) -> Result<(), String> {
     let mut page_job: Option<PageRx> = None;
     let mut preview_job: Option<PageRx> = None;
     let signal = Arc::new(AtomicBool::new(false));
-    for sig in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGHUP] {
-        signal_hook::flag::register(sig, Arc::clone(&signal)).map_err(|e| e.to_string())?;
-    }
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&signal))
+        .map_err(|e| e.to_string())?;
+    // SIGHUP is not in signal_hook's Windows consts.
+    #[cfg(unix)]
+    signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&signal))
+        .map_err(|e| e.to_string())?;
     enable_raw_mode().map_err(|e| e.to_string())?;
     let mut terminal_guard = TerminalGuard::arm(false);
     watchdog::arm(watchdog::Probe::Stdout);
@@ -2155,9 +2158,12 @@ pub fn compose(
     raw: bool,
 ) -> Result<Composed, String> {
     let signal = Arc::new(AtomicBool::new(false));
-    for sig in [signal_hook::consts::SIGTERM, signal_hook::consts::SIGHUP] {
-        signal_hook::flag::register(sig, Arc::clone(&signal)).map_err(|e| e.to_string())?;
-    }
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&signal))
+        .map_err(|e| e.to_string())?;
+    // SIGHUP is not in signal_hook's Windows consts.
+    #[cfg(unix)]
+    signal_hook::flag::register(signal_hook::consts::SIGHUP, Arc::clone(&signal))
+        .map_err(|e| e.to_string())?;
     let mut composer = Composer::open(state, reply_to, quote, targets);
     composer.raw = raw;
     enable_raw_mode().map_err(|e| e.to_string())?;
