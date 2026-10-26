@@ -20,18 +20,20 @@ jobs:
   validate:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     outputs:
       version: ${{ steps.release.outputs.version }}
       prerelease: ${{ steps.release.outputs.prerelease }}
       npm_tag: ${{ steps.release.outputs.npm_tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
+          no-cache: true
       - name: Validate tag, versions and release notes
         id: release
         env:
@@ -67,18 +69,20 @@ jobs:
   test:
     needs: validate
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
       - run: rustup show active-toolchain
       - run: cargo fmt --check
       - run: cargo test --locked
       - run: cargo clippy --locked --all-targets -- -D warnings
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      - uses: actions/setup-node@v6
+          no-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
           package-manager-cache: false
@@ -87,6 +91,7 @@ jobs:
   native:
     needs: [validate, test]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -119,7 +124,7 @@ jobs:
       PACKAGE_MAINTAINER: ${{ vars.PACKAGE_MAINTAINER }}
       MACOSX_DEPLOYMENT_TARGET: '12.0'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
       - name: Setup Rust
@@ -160,7 +165,7 @@ jobs:
           "target/$TARGET/release/socli" --version | grep -Fx "socli $VERSION"
       - name: Package native build
         run: bash scripts/package-native.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.target }}
           path: artifacts/*
@@ -168,7 +173,8 @@ jobs:
 
   web:
     needs: [validate, test]
-    uses: ./.github/workflows/pages.yml
+    timeout-minutes: 45
+    uses: $/.github/workflows/pages.yml
     with:
       version: ${{ needs.validate.outputs.version }}
 
@@ -176,20 +182,22 @@ jobs:
     if: github.event_name == 'push'
     needs: [validate, native, web]
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      - uses: actions/setup-node@v6
+          no-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
           package-manager-cache: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: release-*
           merge-multiple: true
@@ -209,7 +217,7 @@ jobs:
           curl --fail --location --retry 3 "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz" --output "artifacts/socli-$VERSION-source.tar.gz"
           bun scripts/release.ts source-formula "$VERSION" "$GITHUB_REPOSITORY" "artifacts/socli-$VERSION-source.tar.gz" artifacts/socli-core.rb
           bun scripts/release.ts checksums artifacts
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: distribution
           path: artifacts/*
@@ -231,29 +239,30 @@ jobs:
   npm:
     needs: [validate, github-release]
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      - uses: actions/setup-node@v6
+          no-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution
           path: artifacts
       - name: Publish bundled soclish and browser library
         env:
           NPM_TAG: ${{ needs.validate.outputs.npm_tag }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           (builtin cd artifacts && sha256sum --check SHA256SUMS)
           bun scripts/publish-npm.ts artifacts
@@ -262,11 +271,12 @@ jobs:
     needs: [validate, github-release]
     if: needs.validate.outputs.prerelease == 'false' && vars.HOMEBREW_TAP != ''
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution
           path: artifacts
@@ -290,21 +300,23 @@ jobs:
       needs.npm.result == 'success' &&
       (needs.homebrew.result == 'success' || needs.homebrew.result == 'skipped')
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     environment:
       name: production
       url: https://socli.sh
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
-      - uses: actions/setup-node@v6
+          no-cache: true
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: '24'
           package-manager-cache: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: distribution
           path: artifacts
@@ -328,6 +340,7 @@ jobs:
       needs.npm.result == 'success' &&
       (needs.homebrew.result == 'success' || needs.homebrew.result == 'skipped')
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       pages: write
       id-token: write
@@ -338,6 +351,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
-      - uses: actions/deploy-pages@v4
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         id: deployment

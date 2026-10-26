@@ -4,6 +4,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Pinned GitHub Actions to commit SHAs, gated Windows in CI, and dropped the npm token so publication uses GitHub OIDC.
+
 - Fixed Windows compilation by registering SIGHUP only on Unix and widened the watchdog restore bound.
 
 - Bundled all six native executables into the soclish npm package and published the browser library as @massimodeluisa/soclib.

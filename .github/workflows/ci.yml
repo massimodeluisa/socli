@@ -15,7 +15,8 @@ concurrency:
 jobs:
   fmt:
     name: fmt
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -28,7 +29,8 @@ jobs:
 
   clippy:
     name: clippy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -37,17 +39,16 @@ jobs:
         with:
           toolchain: 1.99.1
           components: rustfmt, clippy
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --locked --all-targets -- -D warnings
 
   tests:
     name: tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    timeout-minutes: 30
     strategy:
-      # Windows is allowed to fail and must not cancel the other runners.
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-15, ubuntu-24.04, windows-2025]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -60,7 +61,8 @@ jobs:
 
   wasm:
     name: wasm
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -90,7 +92,8 @@ jobs:
 
   msrv:
     name: msrv
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -104,7 +107,8 @@ jobs:
 
   deny:
     name: cargo deny
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -119,3 +123,21 @@ jobs:
           tool: cargo-deny@0.20.2
           fallback: none
       - run: cargo deny check
+
+  workflows:
+    name: workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: Lint workflows
+        env:
+          ZIZMOR_OFFLINE: "1"
+        run: |
+          mkdir -p "$RUNNER_TEMP/zizmor"
+          curl --fail --location --retry 3 "https://github.com/zizmorcore/zizmor/releases/download/v1.31.1/zizmor-x86_64-unknown-linux-gnu.tar.gz" --output "$RUNNER_TEMP/zizmor/zizmor.tar.gz"
+          echo "d185f726bdaf92df78273217dfdd24ebcd6b0ef48cf3ce776ff5762b6e138c99  $RUNNER_TEMP/zizmor/zizmor.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/zizmor/zizmor.tar.gz" -C "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/zizmor" --offline --collect=workflows .
