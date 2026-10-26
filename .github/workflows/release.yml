@@ -173,7 +173,6 @@ jobs:
 
   web:
     needs: [validate, test]
-    timeout-minutes: 45
     uses: $/.github/workflows/pages.yml
     with:
       version: ${{ needs.validate.outputs.version }}
