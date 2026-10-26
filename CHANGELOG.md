@@ -4,6 +4,8 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Replaced the Open Graph image and linked the site icons to the brand files.
+
 - Removed the invalid timeout from the reusable website job.
 
 - Kept the usage line as socli on Windows, where the executable name is socli.exe.

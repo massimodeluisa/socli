@@ -52,7 +52,8 @@ const rewriteWeb: ReaderRewrite = (req, _res, next) => {
   next()
 }
 
-const ogImageAlt = 'The socli mark, a black So_ square'
+const ogImageAlt =
+  "socli: the words Read. Reply. Post. beside the socli reader in a terminal window, where the selected post shows two photos: an ocean wave and Lisbon's 25 de Abril Bridge at sunset."
 
 export default defineConfig({
   lang: 'en',

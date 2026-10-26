@@ -3,8 +3,11 @@
 .DS_Store
 workers/*/.wrangler/
 
-# Design studies, logo dumps, and the built site. The docs source lives in website/.
-/design/
+# Design studies, logo dumps, and the built site. The docs source lives in website/, and the brand files that website/public/ links to live in design/brand/.
+/design/*
+!/design/brand/
+/design/brand/burst-*.png
+/design/brand/social/
 /IMPROVEMENTS.md
 /site/
 /website/public/**
