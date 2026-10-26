@@ -34,7 +34,8 @@ the scrollback.
 ";
 
 #[derive(Parser)]
-#[command(name = "socli", version, about = "A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon", long_about = ABOUT, disable_help_flag = true, disable_help_subcommand = true)]
+// bin_name stays `socli` on Windows, where argv0 is `socli.exe`.
+#[command(name = "socli", bin_name = "socli", version, about = "A thread-first terminal client for X, Bluesky, dev/null, Threads and Mastodon", long_about = ABOUT, disable_help_flag = true, disable_help_subcommand = true)]
 struct Cli {
     /// Use the offline demo even if accounts are signed in.
     #[arg(long, global = true)]
