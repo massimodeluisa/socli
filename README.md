@@ -25,7 +25,8 @@
   <a href="#sign-in">Sign in</a> ·
   <a href="#the-full-screen-reader">Reader</a> ·
   <a href="#one-shot-commands">Commands</a> ·
-  <a href="#configuration">Configuration</a>
+  <a href="#configuration">Configuration</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">

@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a failure in SoCLI.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search the open issues first. One report is one problem. Do not paste access tokens, app secrets, OAuth codes, or your config file. `socli auth status` redacts secrets.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran, and what SoCLI printed or drew.
+      placeholder: socli post "hello" --net bluesky
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `socli --version`.
+      placeholder: socli 0.1.2
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it happened
+      options:
+        - Terminal
+        - socli.sh
+        - npm package
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The lines that show the failure. Leave out anything that looks like a token.
+      render: shell
+  - type: checkboxes
+    id: before
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues.
+          required: true
+        - label: This report has no access tokens, app secrets, OAuth codes, or config files.
+          required: true

@@ -5,6 +5,7 @@ This page lists every document in the SoCLI repository, a thread-first terminal 
 | Document | What it covers | When to read it |
 | --- | --- | --- |
 | [README.md](../README.md) | What SoCLI is, installing and building, signing in, the reader keys, one-shot commands, detail levels, images and icons, configuration and limits | To use SoCLI or to set it up |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | How to report an issue, open a pull request, and run the checks | Before opening an issue or a pull request |
 | [Current TUI refinement](../design/improvements/REFINEMENT.md) | The original SoCLI visual language, refined in an [interactive preview](../design/improvements/index.html), with an original/refined comparison | To review current visual changes while preserving the existing TUI |
 | [DESIGN.md](DESIGN.md) | The visual system: color tokens, the grid, the detail levels, the anatomy of every screen, the icon sets, hyperlinks and images | Before changing anything the user sees |
 | [CONVENTIONS.md](CONVENTIONS.md) | The toolchain, the module map, rendering rules, errors, tests, configuration and environment variables, commits and documentation | Before changing code |

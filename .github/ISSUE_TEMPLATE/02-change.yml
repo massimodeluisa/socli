@@ -1,0 +1,33 @@
+name: Change request
+description: Propose a change to SoCLI.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search the open issues first. Describe the change before you write a large patch. One request is one change.
+  - type: textarea
+    id: change
+    attributes:
+      label: What should change
+      description: The behavior you want, and the command or screen it belongs to.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried
+      description: Optional. A command, a workaround, or a sketch of the patch.
+  - type: checkboxes
+    id: before
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched the existing issues.
+          required: true
