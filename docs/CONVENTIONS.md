@@ -31,7 +31,7 @@ The page supplies `socli_millis` (`Date.now`), `socli_mono` (`performance.now`),
 
 A new dependency needs its reason stated in the pull request or change description. On macOS, the build also uses `xcrun swiftc` from Xcode Command Line Tools to compile and embed the browser authentication helper in `native/auth-macos.swift`. Other targets omit this helper.
 
-The browser library is published as `soclib`; the native npm launcher is `socli`. [soclib's README](../packages/web/README.md) documents the mounted and headless reader APIs. Its worker and renderer are shared with the website, and `socli_theme` updates an existing browser session's appearance without recreating that session. Changes to the JavaScript bridge also run `bun test scripts/release.test.ts scripts/soclib.test.ts` and the browser checks served by `scripts/serve-soclib.ts` against the packaged library.
+The browser library is published as `@massimodeluisa/soclib`; the native npm launcher is `soclish`. [soclib's README](../packages/web/README.md) documents the mounted and headless reader APIs. Its worker and renderer are shared with the website, and `socli_theme` updates an existing browser session's appearance without recreating that session. Changes to the JavaScript bridge also run `bun test scripts/release.test.ts scripts/soclib.test.ts` and the browser checks served by `scripts/serve-soclib.ts` against the packaged library.
 
 ## Module map
 

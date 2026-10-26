@@ -9,7 +9,7 @@ This page lists every document in the socli repository (SocialCLI, a thread-firs
 | [DESIGN.md](DESIGN.md) | The visual system: color tokens, the grid, the detail levels, the anatomy of every screen, the icon sets, hyperlinks and images | Before changing anything the user sees |
 | [CONVENTIONS.md](CONVENTIONS.md) | The toolchain, the module map, rendering rules, errors, tests, configuration and environment variables, commits and documentation | Before changing code |
 | [RELEASING.md](RELEASING.md) | Release tags, versions, the changelog, platform packages, npm, Homebrew, Pages, and publishing setup | Before preparing or troubleshooting a release |
-| [packages/cli/README.md](../packages/cli/README.md) | The native npm launcher, `npx`, `bunx`, and platform packages | To install or package the terminal client through npm |
+| [packages/cli/README.md](../packages/cli/README.md) | The native npm launcher, `npx`, `bunx`, and the six bundled executables | To install or package the terminal client through npm |
 | [packages/web/README.md](../packages/web/README.md) | soclib's mounted and headless reader APIs, host callbacks, assets, and browser checks | To embed the reader in a browser application |
 | [agents.md](agents.md) | How an AI agent or a script drives socli: agent detection, JSON shapes, scoped ids, errors, exit codes and sign-in | Before calling socli from a script or an agent |
 | [agents/socli/SKILL.md](agents/socli/SKILL.md) | A Claude Code skill that teaches an agent the socli commands and the rules for writing safely | To install the skill into `~/.claude/skills/socli/` |
