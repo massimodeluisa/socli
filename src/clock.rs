@@ -36,21 +36,6 @@ impl Add<Duration> for Instant {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn deadlines_saturate_before_narrowing_large_durations() {
-        assert_eq!(Instant(7) + Duration::MAX, Instant(u64::MAX));
-        assert_eq!(
-            Instant(u64::MAX) + Duration::from_millis(1),
-            Instant(u64::MAX)
-        );
-        assert_eq!(Instant(7) + Duration::from_millis(3), Instant(10));
-    }
-}
-
 impl Sub for Instant {
     type Output = Duration;
 
@@ -132,4 +117,19 @@ unsafe extern "C" {
     The module name is required: without it rust-lld treats these as undefined symbols. */
     fn socli_millis() -> f64;
     fn socli_mono() -> f64;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deadlines_saturate_before_narrowing_large_durations() {
+        assert_eq!(Instant(7) + Duration::MAX, Instant(u64::MAX));
+        assert_eq!(
+            Instant(u64::MAX) + Duration::from_millis(1),
+            Instant(u64::MAX)
+        );
+        assert_eq!(Instant(7) + Duration::from_millis(3), Instant(10));
+    }
 }

@@ -211,7 +211,7 @@ pub fn upsert(draft: &Draft) -> Result<(), String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = draft;
-        return Ok(());
+        Ok(())
     }
     #[cfg(feature = "native")]
     upsert_at(&path(), draft)
@@ -221,7 +221,7 @@ pub fn upsert_at(path: &Path, draft: &Draft) -> Result<(), String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = (path, draft);
-        return Err("the browser demo does not keep drafts".into());
+        Err("the browser demo does not keep drafts".into())
     }
     #[cfg(feature = "native")]
     update_at(path, |drafts| {
@@ -234,7 +234,7 @@ pub fn remove(id: &str) -> Result<(), String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = id;
-        return Ok(());
+        Ok(())
     }
     #[cfg(feature = "native")]
     update_at(&path(), |drafts| {
@@ -282,7 +282,7 @@ pub fn remove_index(index: usize) -> Result<Draft, String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = index;
-        return Err("the browser demo does not keep drafts".into());
+        Err("the browser demo does not keep drafts".into())
     }
     #[cfg(feature = "native")]
     update_at(&path(), |drafts| {

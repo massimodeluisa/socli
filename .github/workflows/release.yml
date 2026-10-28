@@ -173,7 +173,7 @@ jobs:
 
   web:
     needs: [validate, test]
-    uses: ./.github/workflows/pages.yml
+    uses: $/.github/workflows/pages.yml
     with:
       version: ${{ needs.validate.outputs.version }}
 

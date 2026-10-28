@@ -291,7 +291,7 @@ pub fn login(token: Option<String>, app_secret: Option<String>) -> Result<(), St
     #[cfg(target_arch = "wasm32")]
     {
         let _ = http;
-        return Err(format!("{NO_APP}. {hint}"));
+        Err(format!("{NO_APP}. {hint}"))
     }
     #[cfg(not(target_arch = "wasm32"))]
     {

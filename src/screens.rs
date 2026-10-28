@@ -62,7 +62,7 @@ pub fn print(lines: Vec<StyledLine>) -> Result<(), String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = lines;
-        return Ok(());
+        Ok(())
     }
     #[cfg(feature = "native")]
     {
@@ -285,7 +285,7 @@ pub fn present_login(
     {
         let _ = (title, steps, aside);
         note_login_rail(prompt.is_none());
-        return Ok(2);
+        Ok(2)
     }
     #[cfg(feature = "native")]
     {
@@ -358,7 +358,7 @@ pub fn login_steps(steps: &[(&str, &str)], aside: &str) -> Result<(), String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = (steps, aside);
-        return Ok(());
+        Ok(())
     }
     #[cfg(feature = "native")]
     {
@@ -385,7 +385,7 @@ pub fn prompt_rail(title: &str, labels: &[String]) -> Result<usize, String> {
     #[cfg(not(feature = "native"))]
     {
         let _ = (title, labels);
-        return Err(util::NEEDS_PERSON.into());
+        Err(util::NEEDS_PERSON.into())
     }
     #[cfg(feature = "native")]
     {

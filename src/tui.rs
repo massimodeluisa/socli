@@ -4149,7 +4149,7 @@ impl SignInForm {
                         &self.pending_state,
                         &self.pending_verifier,
                     )?;
-                    return Ok(SignResult::SignedIn);
+                    Ok(SignResult::SignedIn)
                 }
                 #[cfg(feature = "native")]
                 {
@@ -4201,7 +4201,7 @@ fn devnull_sign_in(field: impl Fn(&'static str, bool) -> SignField) -> OpenedDev
     #[cfg(not(feature = "native"))]
     {
         let (mut guides, mut aside) = devnull_page_copy();
-        return match crate::net::devnull::prepare() {
+        match crate::net::devnull::prepare() {
             Ok(prepared) => {
                 let _ = crate::util::open_browser(&prepared.url);
                 if let Some(step) = guides.first_mut() {
@@ -4228,7 +4228,7 @@ fn devnull_sign_in(field: impl Fn(&'static str, bool) -> SignField) -> OpenedDev
                 verifier: String::new(),
                 error: Some(error),
             },
-        };
+        }
     }
     #[cfg(feature = "native")]
     {

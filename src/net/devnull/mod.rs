@@ -219,9 +219,9 @@ impl DevnullClient {
         #[cfg(not(feature = "native"))]
         {
             let _ = (draft, key_line);
-            return Err(NetError::Other(
+            Err(NetError::Other(
                 "GitHub SSH signing stays in the terminal. run `socli login devnull`.".into(),
-            ));
+            ))
         }
         #[cfg(feature = "native")]
         {

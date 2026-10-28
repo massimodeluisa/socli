@@ -477,7 +477,7 @@ pub fn page_callback(raw: &str) -> Result<String, String> {
 pub fn page_url() -> Result<String, String> {
     #[cfg(target_arch = "wasm32")]
     {
-        return page_url_from_host();
+        page_url_from_host()
     }
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -533,7 +533,7 @@ pub fn open_browser(url: &str) -> Result<(), String> {
     #[cfg(not(feature = "native"))]
     {
         crate::clip::note_open(&plan.arg);
-        return Ok(());
+        Ok(())
     }
     #[cfg(feature = "native")]
     {

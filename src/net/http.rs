@@ -44,7 +44,7 @@ mod imp {
     const TOO_SMALL: usize = usize::MAX;
     const MAX_RESPONSE: usize = 8 * 1024 * 1024;
 
-    #[derive(Clone, Copy, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct Client;
 
     impl Client {
@@ -79,7 +79,7 @@ mod imp {
         Ok(Client)
     }
 
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    #[derive(Clone, PartialEq, Eq, Debug)]
     pub struct Method(&'static str);
 
     impl Method {
@@ -88,7 +88,7 @@ mod imp {
         pub const PUT: Self = Self("PUT");
         pub const DELETE: Self = Self("DELETE");
 
-        pub fn as_str(self) -> &'static str {
+        pub fn as_str(&self) -> &'static str {
             self.0
         }
     }
@@ -283,6 +283,18 @@ mod imp {
 
         impl HeaderValue {
             pub fn from_str(value: &str) -> Result<Self, InvalidHeaderValue> {
+                value.parse()
+            }
+
+            pub fn to_str(&self) -> Result<&str, InvalidHeaderValue> {
+                Ok(&self.0)
+            }
+        }
+
+        impl std::str::FromStr for HeaderValue {
+            type Err = InvalidHeaderValue;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
                 if value
                     .bytes()
                     .any(|byte| byte == 0 || byte == b'\r' || byte == b'\n')
@@ -290,10 +302,6 @@ mod imp {
                     return Err(InvalidHeaderValue);
                 }
                 Ok(Self(value.to_string()))
-            }
-
-            pub fn to_str(&self) -> Result<&str, InvalidHeaderValue> {
-                Ok(&self.0)
             }
         }
 

@@ -61,7 +61,7 @@ pub fn finish(callback: &str, state: &str, verifier: &str) -> Result<(), String>
         .ok_or_else(|| "the device key is missing. open dev/null sign-in again".to_string())?;
     let key = sign::from_openssh(&pem)?;
     let client = http::client()?;
-    let body = flow::approval_body(&code, &verifier);
+    let body = flow::approval_body(&code, verifier);
     let response = api::request(
         &client,
         Some(&key),

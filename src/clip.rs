@@ -54,7 +54,7 @@ pub fn copy(text: &str) -> Result<Via, String> {
     #[cfg(not(feature = "native"))]
     {
         COPIED.with(|slot| *slot.borrow_mut() = Some(text.to_string()));
-        return Ok(Via::System);
+        Ok(Via::System)
     }
     #[cfg(feature = "native")]
     {

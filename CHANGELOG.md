@@ -44,10 +44,10 @@ This release fixed cases where a failed request could appear successful, a refre
 - Added a Linux installer that selected a release package, verified its checksum and printed how to start SoCLI.
 - Added macOS installer disk images for Apple Silicon and Intel, alongside the existing archives and Linux packages.
 - Required both npm archives, both macOS disk images, every Linux package and the Homebrew formulas before publishing. Rejected empty artifacts and honored npm package-name overrides.
-- Corrected the reusable web workflow path, rejected duplicate changelog version sections and stopped packaging when a browser bundle failed.
+- Rejected duplicate changelog version sections and stopped packaging when a browser bundle failed.
 - Wired the documented optional npm publishing token while keeping GitHub trusted publishing as the default.
 - Added contributing guidelines and issue and pull request templates. Moved the TUI tests into a dedicated module and expanded regression coverage for session expiry, rejected actions, offline recovery, cursor boundaries and durable drafts.
-- Removed all 71 existing WebAssembly build warnings with platform-specific imports and helpers, and made warnings fail the WebAssembly CI jobs. Added an execution test of the compiled module for isolated readers, keyboard input, theme changes and resizing.
+- Aligned the browser HTTP shim with the native client's traits and removed browser-only lint warnings. Removed all 71 existing WebAssembly build warnings with platform-specific imports and helpers, and made warnings fail the WebAssembly CI jobs. Added an execution test of the compiled module for isolated readers, keyboard input, theme changes and resizing.
 - Checked deadline and section-navigation arithmetic at numeric boundaries.
 
 ### Compatibility and verification limits
