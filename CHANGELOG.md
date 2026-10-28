@@ -41,6 +41,8 @@ This release fixed cases where a failed request could appear successful, a refre
 
 ### Installation and release checks
 
+- Preserved dependency versions and checksums during the application version update.
+
 - Included the Linux installer in clean checkouts and ran the release-tool tests in ordinary CI before tagging.
 
 - Added a Linux installer that selected a release package, verified its checksum and printed how to start SoCLI.
