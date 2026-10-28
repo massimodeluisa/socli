@@ -1,6 +1,6 @@
-# Rust source review for 0.1.3
+# Rust source review for 0.1.4
 
-The October 2026 review concentrated on failures that could lose a draft, report an action as successful without confirmation, replace a newer login, or leave the reader unable to recover after a network outage. The fixes ship together in 0.1.3. This record explains the review's coverage and its limits.
+The October 2026 review concentrated on failures that could lose a draft, report an action as successful without confirmation, replace a newer login, or leave the reader unable to recover after a network outage. The fixes ship together in 0.1.4. This record explains the review's coverage and its limits.
 
 ## Source coverage
 

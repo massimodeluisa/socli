@@ -4,7 +4,7 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-10-29
+## [0.1.4] - 2026-10-29
 
 This release fixed cases where a failed request could appear successful, a refresh could replace a newer login, or a saved draft could lose the warning that its post may already have reached the network. It also kept cached feed content available during partial outages and added installers for Linux and macOS.
 
@@ -41,6 +41,8 @@ This release fixed cases where a failed request could appear successful, a refre
 
 ### Installation and release checks
 
+- Included the Linux installer in clean checkouts and ran the release-tool tests in ordinary CI before tagging.
+
 - Added a Linux installer that selected a release package, verified its checksum and printed how to start SoCLI.
 - Added macOS installer disk images for Apple Silicon and Intel, alongside the existing archives and Linux packages.
 - Required both npm archives, both macOS disk images, every Linux package and the Homebrew formulas before publishing. Rejected empty artifacts and honored npm package-name overrides.
@@ -52,7 +54,11 @@ This release fixed cases where a failed request could appear successful, a refre
 
 ### Compatibility and verification limits
 
-The review used fixtures and local HTTP servers. It did not send posts or actions to real accounts. X's private GraphQL interface can still change upstream, and a lost write response still requires checking the network before retrying. Large conversations retain each provider's existing depth and page limits. The [review record](https://github.com/massimodeluisa/socli/blob/v0.1.3/docs/REVIEW.md) describes the source coverage and remaining boundaries.
+The review used fixtures and local HTTP servers. It did not send posts or actions to real accounts. X's private GraphQL interface can still change upstream, and a lost write response still requires checking the network before retrying. Large conversations retain each provider's existing depth and page limits. The [review record](https://github.com/massimodeluisa/socli/blob/v0.1.4/docs/REVIEW.md) describes the source coverage and remaining boundaries.
+
+## [0.1.3] - 2026-10-29
+
+The tag produced no release artifacts. Publication stopped because the installer was missing from the checkout. Version 0.1.4 includes the source changes and the corrected packaging.
 
 ## [0.1.2] - 2026-10-26
 

@@ -1,6 +1,6 @@
 {
   "name": "@massimodeluisa/soclib",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "The SoCLI browser reader and WebAssembly engine",
   "type": "module",
   "license": "MIT",

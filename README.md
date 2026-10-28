@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://socli.sh"><img src="https://img.shields.io/badge/socli.sh-0f1419?style=flat-square" alt="socli.sh" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
-  <a href="https://github.com/massimodeluisa/socli"><img src="https://img.shields.io/badge/version-0.1.3-blue?style=flat-square" alt="version 0.1.3" /></a>
+  <a href="https://github.com/massimodeluisa/socli"><img src="https://img.shields.io/badge/version-0.1.4-blue?style=flat-square" alt="version 0.1.4" /></a>
   <a href="https://isready.ai"><img src="https://isready.ai/badge/socli.sh" alt="AI readiness" /></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Format-Agent_Skills-orange?style=flat-square" alt="Agent Skills format" /></a>
 </p>

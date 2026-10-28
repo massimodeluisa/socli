@@ -140,7 +140,7 @@ A comment that restates the code does not belong in the repository. Keep a comme
 
 ## Tests
 
-The [0.1.3 source review](REVIEW.md) records the failure paths covered by the regression suite and the boundaries that still need live-provider verification.
+The [0.1.4 source review](REVIEW.md) records the failure paths covered by the regression suite and the boundaries that still need live-provider verification.
 
 Unit tests live in a `#[cfg(test)] mod tests` block next to the code they test. The integration tests in `tests/cli.rs` run the built binary through the `socli()` helper, which sets `SOCLI_CONFIG_DIR` to an empty temporary directory, `NO_COLOR=1`, `TERM_PROGRAM=vscode`, `TERM=xterm-256color`, `SSH_TTY=1` and `SOCLI_AGENT=0`, and removes `SOCLI_ICONS`, `NO_ICONS`, `SOCLI_NET`, `SOCLI_THEME`, `SOCLI_DENSITY`, `SOCLI_DETAIL`, `SOCLI_LAYOUT`, `SOCLI_MOUSE`, `SOCLI_IMAGE`, `SOCLI_TRUECOLOR`, `SOCLI_TRACE_FRAMES`, `COLORFGBG` and every network credential variable, so the output is the same on every machine. Tests never touch the network and never read or write `~/.config/socli`. A test that needs to write uses its own directory from `own_config`. Unit tests must not trigger a settings save, because that would write the real config. Renderer tests assert the columns of elbows, stats and folds, and check that no Private Use Area character appears in Unicode mode.
 

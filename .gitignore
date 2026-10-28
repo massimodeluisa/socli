@@ -11,6 +11,7 @@ workers/*/.wrangler/
 /IMPROVEMENTS.md
 /site/
 /website/public/**
+!/website/public/install.sh
 !/website/public/fonts/
 !/website/public/fonts/*
 !/website/public/brand/

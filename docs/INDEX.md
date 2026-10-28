@@ -10,7 +10,7 @@ This page lists every document in the SoCLI repository, a thread-first terminal 
 | [DESIGN.md](DESIGN.md) | The visual system: color tokens, the grid, the detail levels, the anatomy of every screen, the icon sets, hyperlinks and images | Before changing anything the user sees |
 | [CONVENTIONS.md](CONVENTIONS.md) | The toolchain, the module map, rendering rules, errors, tests, configuration and environment variables, commits and documentation | Before changing code |
 | [RELEASING.md](RELEASING.md) | Release tags, versions, the changelog, platform packages, npm, Homebrew, Pages, and publishing setup | Before preparing or troubleshooting a release |
-| [REVIEW.md](REVIEW.md) | Source review coverage, corrected failure behavior, verification and remaining boundaries for 0.1.3 | To assess the reliability changes and their limits |
+| [REVIEW.md](REVIEW.md) | Source review coverage, corrected failure behavior, verification and remaining boundaries for 0.1.4 | To assess the reliability changes and their limits |
 | [packages/cli/README.md](../packages/cli/README.md) | The native npm launcher, `npx`, `bunx`, and the six bundled executables | To install or package the terminal client through npm |
 | [packages/web/README.md](../packages/web/README.md) | soclib's mounted and headless reader APIs, host callbacks, assets, and browser checks | To embed the reader in a browser application |
 | [agents.md](agents.md) | How an AI agent or a script drives SoCLI: agent detection, JSON shapes, scoped ids, errors, exit codes and sign-in | Before calling SoCLI from a script or an agent |
