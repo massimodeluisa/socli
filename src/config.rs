@@ -352,6 +352,7 @@ impl From<LegacyConfig> for Config {
 /// Where the config lives, and the pre-rename file to migrate from when it does not exist yet.
 struct Paths {
     file: PathBuf,
+    #[cfg(any(test, not(target_arch = "wasm32")))]
     legacy: Option<PathBuf>,
 }
 
@@ -360,6 +361,7 @@ fn paths(env: impl Fn(&str) -> Option<OsString>) -> Paths {
     if let Some(dir) = env("SOCLI_CONFIG_DIR") {
         return Paths {
             file: PathBuf::from(dir).join("config.toml"),
+            #[cfg(any(test, not(target_arch = "wasm32")))]
             legacy: None,
         };
     }
@@ -369,10 +371,12 @@ fn paths(env: impl Fn(&str) -> Option<OsString>) -> Paths {
     match base {
         Some(base) => Paths {
             file: base.join("socli").join("config.toml"),
+            #[cfg(any(test, not(target_arch = "wasm32")))]
             legacy: Some(base.join("xcli").join("config.toml")),
         },
         None => Paths {
             file: PathBuf::from("socli-config.toml"),
+            #[cfg(any(test, not(target_arch = "wasm32")))]
             legacy: None,
         },
     }
@@ -489,6 +493,7 @@ pub fn update(change: impl FnOnce(&mut Config)) -> Result<Config, String> {
     }
 }
 
+#[cfg(any(test, not(target_arch = "wasm32")))]
 fn update_at(paths: &Paths, change: impl FnOnce(&mut Config)) -> Result<Config, String> {
     locked(&paths.file, || {
         let mut config = load_at(paths)?;
@@ -615,11 +620,12 @@ pub fn set(config: &mut Config, key: &str, value: &str) -> Result<String, String
             let list = if value.trim().eq_ignore_ascii_case("all") {
                 vec!["all".to_string()]
             } else {
-                crate::net::parse_list(value)
-                    .map_err(|_| bad_value(value, key, nets))?
-                    .iter()
-                    .map(|net| net.slug().to_string())
-                    .collect()
+                let parsed =
+                    crate::net::parse_list(value).map_err(|_| bad_value(value, key, nets))?;
+                if let Some(message) = parsed.iter().find_map(|net| net.hold()) {
+                    return Err(message.into());
+                }
+                parsed.iter().map(|net| net.slug().to_string()).collect()
             };
             let saved = list.join(",");
             config.feed.networks = Some(list);
@@ -636,6 +642,9 @@ pub fn set(config: &mut Config, key: &str, value: &str) -> Result<String, String
             let net: Network = value.parse().map_err(|_| {
                 bad_value(value, key, "none, x, bluesky, devnull, threads, mastodon")
             })?;
+            if let Some(message) = net.hold() {
+                return Err(message.into());
+            }
             net.slug().to_string()
         }
         "ui.detail" => choice::<Detail>(value, key)?,
@@ -706,12 +715,18 @@ pub fn redact(secret: Option<&str>) -> String {
     }
 }
 
+#[cfg(any(test, not(target_arch = "wasm32")))]
 fn load_at(paths: &Paths) -> Result<Config, String> {
     if paths.file.exists() {
         let text = fs::read_to_string(&paths.file)
             .map_err(|e| format!("reading {}: {e}", paths.file.display()))?;
-        let invalid =
-            |e: toml::de::Error| format!("{} is not valid toml: {e}", paths.file.display());
+        let invalid = |e: toml::de::Error| {
+            format!(
+                "{} is not valid toml{}; check its syntax and field types",
+                paths.file.display(),
+                error_location(&e, &text)
+            )
+        };
         let mut config: Config = toml::from_str(&text).map_err(invalid)?;
         config.net_colors = toml::from_str::<ColorsFile>(&text)
             .map_err(invalid)?
@@ -725,8 +740,8 @@ fn load_at(paths: &Paths) -> Result<Config, String> {
                 fs::read_to_string(old).map_err(|e| format!("reading {}: {e}", old.display()))?;
             let legacy: LegacyConfig = toml::from_str(&text).map_err(|e| {
                 format!(
-                    "{} is not valid toml, so it was not migrated: {e}",
-                    old.display()
+                    "{} is not valid toml{}, so it was not migrated; check its syntax and field types",
+                    old.display(), error_location(&e, &text)
                 )
             })?;
             let mut config = Config::from(legacy);
@@ -738,6 +753,21 @@ fn load_at(paths: &Paths) -> Result<Config, String> {
     }
 }
 
+/** Parser diagnostics can contain entire credential values, even without a source excerpt. */
+fn error_location(error: &toml::de::Error, text: &str) -> String {
+    let Some(span) = error.span() else {
+        return String::new();
+    };
+    let before = &text.as_bytes()[..span.start.min(text.len())];
+    let line = before.iter().filter(|byte| **byte == b'\n').count() + 1;
+    let column = before
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .map_or(before.len() + 1, |newline| before.len() - newline);
+    format!(" at line {line}, column {column}")
+}
+
+#[cfg(any(test, not(target_arch = "wasm32")))]
 fn write(path: &Path, config: &Config) -> Result<(), String> {
     let text = toml::to_string_pretty(&FileOut::new(config)).map_err(|e| e.to_string())?;
     write_atomic(path, &text)
@@ -778,7 +808,12 @@ fn load_browser() -> Result<Config, String> {
     if text.trim().is_empty() {
         return Ok(Config::default());
     }
-    let invalid = |err: toml::de::Error| format!("the saved config is not valid toml: {err}");
+    let invalid = |err: toml::de::Error| {
+        format!(
+            "the saved config is not valid toml{}; check its syntax and field types",
+            error_location(&err, &text)
+        )
+    };
     let mut config: Config = toml::from_str(&text).map_err(invalid)?;
     config.net_colors = toml::from_str::<ColorsFile>(&text)
         .map_err(invalid)?
@@ -921,6 +956,37 @@ mod tests {
     }
 
     #[test]
+    fn invalid_configuration_reports_location_without_secret_values() {
+        let dir = temp("private-errors");
+        let paths = Paths {
+            file: dir.join("config.toml"),
+            legacy: None,
+        };
+        for text in [
+            "[x]\naccess_token = \"private-token\" broken\n",
+            "[x]\naccess_token = [\"private-token\"]\n",
+            "[x]\ncolor = [\"private-token\"]\n",
+        ] {
+            fs::write(&paths.file, text).unwrap();
+            let error = load_at(&paths).unwrap_err();
+            assert!(error.contains("at line 2, column"), "{error}");
+            assert!(!error.contains("private-token"), "{error}");
+            assert_eq!(fs::read_to_string(&paths.file).unwrap(), text);
+        }
+        let legacy = dir.join("legacy.toml");
+        fs::write(&legacy, "access_token = [\"private-token\"]\n").unwrap();
+        let paths = Paths {
+            file: dir.join("unmigrated.toml"),
+            legacy: Some(legacy),
+        };
+        let error = load_at(&paths).unwrap_err();
+        assert!(error.contains("not migrated"), "{error}");
+        assert!(!error.contains("private-token"), "{error}");
+        assert!(!paths.file.exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn migrates_the_flat_xcli_file_into_an_x_section() {
         let xdg = temp("migrate");
         let old = xdg.join("xcli").join("config.toml");
@@ -1011,6 +1077,19 @@ mod tests {
             "newest"
         );
         assert_eq!(set(&mut config, "default_network", "none").unwrap(), "none");
+        assert_eq!(
+            set(&mut config, "feed.networks", "threads").unwrap_err(),
+            "Waiting for Meta approval"
+        );
+        assert_eq!(
+            set(&mut config, "feed.networks", "x,threads").unwrap_err(),
+            "Waiting for Meta approval"
+        );
+        assert_eq!(
+            set(&mut config, "default_network", "threads").unwrap_err(),
+            "Waiting for Meta approval"
+        );
+        assert_eq!(set(&mut config, "feed.networks", "all").unwrap(), "all");
         assert_eq!(
             set(&mut config, "bluesky.color", "#AABBCC").unwrap(),
             "#aabbcc"

@@ -306,6 +306,7 @@ pub fn present_login(
 }
 
 /// Writes one row and a trailing space, without a newline, so a prompt can continue on it.
+#[cfg(any(test, feature = "native"))]
 fn write_open(line: &StyledLine) -> Result<(), String> {
     let stderr = TO_STDERR.load(Ordering::Relaxed);
     let color = (if stderr {
@@ -437,6 +438,7 @@ fn login_width() -> usize {
     util::terminal_width(100).clamp(20, 140)
 }
 
+#[cfg(any(test, feature = "native"))]
 fn follow_lines(
     steps: &[(&str, &str)],
     aside: &str,
@@ -797,6 +799,7 @@ impl Drop for RailCook {
     }
 }
 
+#[cfg(any(test, feature = "native"))]
 fn menu_lines(labels: &[String], selected: usize, width: usize) -> Vec<StyledLine> {
     let mut canvas = Canvas::new(width);
     for (index, label) in labels.iter().enumerate() {
@@ -1523,16 +1526,20 @@ pub fn network_rows(state: &State) -> Vec<PickRow> {
     }];
     for (net, key) in Network::ALL.into_iter().zip('1'..) {
         let signed_in = available.contains(&net);
+        let held = state.held(net);
         rows.push(PickRow {
             key,
             mark: if signed_in { net.accent() } else { Kind::Dim },
             label: net.title().into(),
-            value: match state.handle_of(net) {
-                Some(handle) if signed_in => format!("@{handle}"),
-                _ => "not signed in".into(),
+            value: match held {
+                Some(message) => message.into(),
+                None => match state.handle_of(net) {
+                    Some(handle) if signed_in => format!("@{handle}"),
+                    _ => "not signed in".into(),
+                },
             },
             current: several && state.scope() == Scope::One(net),
-            enabled: signed_in,
+            enabled: signed_in && held.is_none(),
         });
     }
     rows

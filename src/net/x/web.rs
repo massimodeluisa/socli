@@ -22,7 +22,7 @@ use crate::net::http::header;
 use serde_json::{json, Value};
 
 use super::auth::Credentials;
-use super::client::{ApiError, XClient};
+use super::client::{request_failure, retry_after, ApiError, XClient};
 use crate::model::{Link, Media, MediaKind, Metrics, Page, Post, User};
 use crate::net::Network;
 
@@ -299,7 +299,9 @@ impl XClient {
             .pointer("/data/create_tweet/tweet_results/result/rest_id")
             .and_then(|v| v.as_str())
             .map(str::to_string)
-            .ok_or_else(|| ApiError::Other("X accepted the post but returned no id".into()))
+            .ok_or_else(|| {
+                ApiError::OutcomeUnknown("X accepted the post but returned no id".into())
+            })
     }
 
     pub(super) fn web_delete(&self, id: &str) -> Result<(), ApiError> {
@@ -314,7 +316,22 @@ impl XClient {
         } else {
             "UnfavoriteTweet"
         };
-        self.gql(name, json!({ "tweet_id": id }), Gql::Post, None)?;
+        let value = self.gql(name, json!({ "tweet_id": id }), Gql::Post, None)?;
+        let field = if on {
+            "favorite_tweet"
+        } else {
+            "unfavorite_tweet"
+        };
+        if value
+            .get("data")
+            .and_then(|data| data.get(field))
+            .and_then(Value::as_str)
+            != Some("Done")
+        {
+            return Err(ApiError::OutcomeUnknown(
+                "X did not confirm the like".into(),
+            ));
+        }
         Ok(())
     }
 
@@ -347,7 +364,7 @@ impl XClient {
     /// Follow uses the REST friendship endpoints. GraphQL no longer ships CreateFriendship.
     pub(super) fn web_follow(&self, user_id: &str, on: bool) -> Result<(), ApiError> {
         let action = if on { "create" } else { "destroy" };
-        let url = format!("https://x.com/i/api/1.1/friendships/{action}.json");
+        let url = format!("{}/i/api/1.1/friendships/{action}.json", self.web_origin());
         let response = self
             .http()
             .post(url)
@@ -355,11 +372,25 @@ impl XClient {
             .header("content-type", "application/x-www-form-urlencoded")
             .body(format!("user_id={user_id}&skip_status=true"))
             .send()
-            .map_err(|err| ApiError::Other(format!("the X follow request failed: {err}")))?;
+            .map_err(|error| request_failure(error, true))?;
         let status = response.status();
-        let text = response.text().unwrap_or_default();
-        if status.is_success() || already_following(&text) {
+        let text = crate::net::http::read_text(response).map_err(ApiError::OutcomeUnknown)?;
+        if already_following(&text) && on {
             return Ok(());
+        }
+        if status.is_success() {
+            let value: Value = serde_json::from_str(&text).map_err(|_| {
+                ApiError::OutcomeUnknown("X did not confirm the follow state".into())
+            })?;
+            if let Some(message) = graphql_error(&value) {
+                return Err(ApiError::Other(message));
+            }
+            if value.get("id_str").and_then(Value::as_str).is_some() {
+                return Ok(());
+            }
+            return Err(ApiError::OutcomeUnknown(
+                "X did not confirm the follow state".into(),
+            ));
         }
         Err(ApiError::from_response(status, &text))
     }
@@ -428,32 +459,49 @@ impl XClient {
             };
             insert_header(&mut headers, "x-client-transaction-id", &header)?;
         }
+        let failed = |message: String| {
+            if is_mutation(name) {
+                ApiError::OutcomeUnknown(message)
+            } else {
+                ApiError::Other(message)
+            }
+        };
         let response = request
             .headers(headers)
             .send()
-            .map_err(|err| ApiError::Other(format!("the X request failed: {err}")))?;
+            .map_err(|error| request_failure(error, is_mutation(name)))?;
         let status = response.status();
         if status.as_u16() == 429 {
-            let retry_after = response
-                .headers()
-                .get("retry-after")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.parse().ok());
+            let retry_after = retry_after(response.headers(), crate::clock::unix_secs());
             return Err(ApiError::RateLimited { retry_after });
         }
-        let text = response.text().unwrap_or_default();
+        let text = crate::net::http::read_text(response)
+            .map_err(|error| failed(format!("reading the X response: {error}")))?;
         if !status.is_success() {
             return Err(ApiError::from_response(status, &text));
         }
         let value: Value = serde_json::from_str(&text)
-            .map_err(|_| ApiError::Other("X returned a response socli could not read".into()))?;
-        if timeline_present(&value) || mutation_ok(&value) {
+            .map_err(|_| failed("X returned a response socli could not read".into()))?;
+        if timeline_present(&value) && !is_mutation(name) {
             return Ok(value);
         }
         if let Some(message) = graphql_error(&value) {
-            return Err(ApiError::Other(message));
+            let status = if graphql_auth_error(&value) { 401 } else { 403 };
+            return Err(ApiError::Failed {
+                status,
+                detail: message,
+                hint: if status == 401 {
+                    "\nThe X session expired or was rejected. Run `socli login x` again.".into()
+                } else {
+                    String::new()
+                },
+            });
         }
-        Ok(value)
+        if mutation_ok(&value) {
+            Ok(value)
+        } else {
+            Err(failed("X returned no result".into()))
+        }
     }
 
     fn query_id(&self, name: &str) -> Result<String, ApiError> {
@@ -756,8 +804,43 @@ fn timeline_present(value: &Value) -> bool {
     instructions_of(value).is_some()
 }
 
+fn is_mutation(name: &str) -> bool {
+    matches!(
+        name,
+        "CreateTweet"
+            | "DeleteTweet"
+            | "FavoriteTweet"
+            | "UnfavoriteTweet"
+            | "CreateRetweet"
+            | "DeleteRetweet"
+            | "CreateBookmark"
+            | "DeleteBookmark"
+    )
+}
+
 fn mutation_ok(value: &Value) -> bool {
-    value.get("data").is_some() && graphql_error(value).is_none()
+    value
+        .get("data")
+        .and_then(Value::as_object)
+        .is_some_and(|data| {
+            data.values()
+                .any(|value| !value.is_null() && value != &Value::Bool(false))
+        })
+        && graphql_error(value).is_none()
+}
+
+fn graphql_auth_error(value: &Value) -> bool {
+    value
+        .get("errors")
+        .and_then(Value::as_array)
+        .is_some_and(|errors| {
+            errors.iter().any(|error| {
+                matches!(
+                    error.get("code").and_then(Value::as_u64),
+                    Some(32 | 89 | 215 | 239)
+                )
+            })
+        })
 }
 
 fn graphql_error(value: &Value) -> Option<String> {
@@ -766,8 +849,10 @@ fn graphql_error(value: &Value) -> Option<String> {
         .iter()
         .filter_map(|err| err.get("message")?.as_str())
         .collect();
-    if parts.is_empty() {
+    if errors.is_empty() {
         None
+    } else if parts.is_empty() {
+        Some("X rejected the request".into())
     } else {
         Some(parts.join("; "))
     }
@@ -929,6 +1014,7 @@ fn cursor_value(content: &Value) -> Option<String> {
     content
         .get("value")
         .and_then(Value::as_str)
+        .filter(|cursor| !cursor.is_empty())
         .map(str::to_string)
 }
 
@@ -1274,6 +1360,87 @@ fn write_disk(cache: &OpCache) -> Result<(), ()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn mutation_client(body: Option<&'static str>) -> XClient {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            use std::io::{Read, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .unwrap();
+            let mut request = [0u8; 16384];
+            let _ = stream.read(&mut request);
+            if let Some(body) = body {
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+        let client = XClient::for_test(
+            Credentials {
+                auth_token: Some("test-session".into()),
+                ct0: Some("test-csrf".into()),
+                ..Credentials::default()
+            },
+            format!("http://{addr}"),
+        )
+        .unwrap();
+        client.with_ops(|ops| {
+            ops.loaded = true;
+            ops.fetched_at = now_secs();
+        });
+        client
+    }
+
+    #[test]
+    fn browser_likes_require_an_acknowledgement() {
+        for body in [
+            r#"{"data":null}"#,
+            r#"{"data":{"favorite_tweet":null}}"#,
+            r#"{"data":{"unrelated":"Done"}}"#,
+        ] {
+            let client = mutation_client(Some(body));
+            assert!(matches!(
+                client.web_like("post", true),
+                Err(ApiError::OutcomeUnknown(_))
+            ));
+        }
+        mutation_client(Some(r#"{"data":{"favorite_tweet":"Done"}}"#))
+            .web_like("post", true)
+            .unwrap();
+        mutation_client(Some(r#"{"data":{"unfavorite_tweet":"Done"}}"#))
+            .web_like("post", false)
+            .unwrap();
+    }
+
+    #[test]
+    fn browser_write_rejections_and_lost_responses_stay_distinct() {
+        let client = mutation_client(Some(
+            r#"{"data":null,"errors":[{"code":89,"message":"expired"}]}"#,
+        ));
+        let error = client.web_like("post", true).unwrap_err();
+        assert!(matches!(error, ApiError::Failed { status: 401, .. }));
+        assert!(error.to_string().contains("socli login x"));
+        let client = mutation_client(None);
+        assert!(matches!(
+            client.web_like("post", true),
+            Err(ApiError::OutcomeUnknown(_))
+        ));
+    }
+
+    #[test]
+    fn code_only_graphql_errors_are_rejections() {
+        assert!(
+            graphql_error(&json!({"data":{"favorite_tweet":"Done"},"errors":[{"code":89}]}))
+                .is_some()
+        );
+        assert!(!mutation_ok(&json!({"data":null})));
+        assert!(!mutation_ok(&json!({"data":{"favorite_tweet":false}})));
+    }
 
     #[test]
     fn home_html_names_one_account() {

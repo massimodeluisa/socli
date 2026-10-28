@@ -105,7 +105,21 @@ impl BlueskyClient {
             let token = self.session.as_ref().map(|s| s.access_jwt.clone());
             raw = rpc::send(&client, &url, call, token.as_deref())?;
         }
-        rpc::finish(raw)
+        let result = rpc::finish(raw);
+        if matches!(call, Call::Write(_)) {
+            result.map_err(|error| match error {
+                NetError::Parse { .. }
+                | NetError::Http {
+                    status: 500..=599, ..
+                } => NetError::OutcomeUnknown {
+                    net: Network::Bluesky,
+                    message: error.to_string(),
+                },
+                other => other,
+            })
+        } else {
+            result
+        }
     }
 
     fn get(&mut self, nsid: &str, query: &[(&str, String)]) -> Result<Value, NetError> {
@@ -113,7 +127,7 @@ impl BlueskyClient {
     }
 
     fn send_json(&mut self, nsid: &str, body: &Value) -> Result<Value, NetError> {
-        self.xrpc(nsid, &Call::Post(Some(body)))
+        self.xrpc(nsid, &Call::Write(body))
     }
 
     /// Trades the refresh token for a new pair, saves it, and keeps it in memory.
@@ -123,20 +137,21 @@ impl BlueskyClient {
         let refresh_jwt = session.refresh_jwt.clone().ok_or_else(signed_out)?;
         let url = format!("{}/xrpc/com.atproto.server.refreshSession", session.service);
         let raw = rpc::send(client, &url, &Call::Post(None), Some(&refresh_jwt))?;
-        let value = rpc::finish(raw).map_err(|_| signed_out())?;
-        let text = |key: &str| value.get(key).and_then(Value::as_str).map(str::to_string);
-        let (Some(access), Some(refresh)) = (text("accessJwt"), text("refreshJwt")) else {
-            return Err(signed_out());
-        };
-        if let Some(session) = self.session.as_mut() {
-            session.access_jwt = access.clone();
-            session.refresh_jwt = Some(refresh.clone());
-        }
+        let (access, refresh) = rpc::refreshed(raw)?;
+        let mut saved = false;
         config::update(|cfg| {
-            cfg.bluesky.access_jwt = Some(access);
-            cfg.bluesky.refresh_jwt = Some(refresh);
+            saved = save_refresh(&mut cfg.bluesky, session, &access, &refresh);
         })
         .map_err(|e| NetError::Other(format!("could not save the refreshed session: {e}")))?;
+        if !saved {
+            return Err(NetError::Other(
+                "the Bluesky sign-in changed while refreshing. run the command again".into(),
+            ));
+        }
+        if let Some(session) = self.session.as_mut() {
+            session.access_jwt = access;
+            session.refresh_jwt = Some(refresh);
+        }
         Ok(())
     }
 
@@ -193,10 +208,20 @@ impl BlueskyClient {
         )
     }
 
-    fn create_record(&mut self, collection: &str, record: Value) -> Result<Value, NetError> {
+    fn create_record(&mut self, collection: &str, mut record: Value) -> Result<Value, NetError> {
         let repo = self.session()?.did.clone();
+        record["$type"] = json!(collection);
         let body = json!({"repo": repo, "collection": collection, "record": record});
-        self.send_json("com.atproto.repo.createRecord", &body)
+        let created = self.send_json("com.atproto.repo.createRecord", &body)?;
+        if created.get("uri").and_then(Value::as_str).is_none()
+            || created.get("cid").and_then(Value::as_str).is_none()
+        {
+            return Err(NetError::OutcomeUnknown {
+                net: Network::Bluesky,
+                message: "Bluesky did not confirm the new record".into(),
+            });
+        }
+        Ok(created)
     }
 
     fn delete_record(&mut self, collection: &str, rkey: &str) -> Result<(), NetError> {
@@ -249,7 +274,30 @@ fn cursor_of(value: &Value) -> Option<String> {
     value
         .get("cursor")
         .and_then(Value::as_str)
+        .filter(|cursor| !cursor.is_empty())
         .map(str::to_string)
+}
+
+fn save_refresh(
+    section: &mut BlueskyConfig,
+    session: &Session,
+    access: &str,
+    refresh: &str,
+) -> bool {
+    if section.did.as_deref() != Some(session.did.as_str())
+        || section.refresh_jwt != session.refresh_jwt
+        || section
+            .service
+            .as_deref()
+            .unwrap_or(DEFAULT_SERVICE)
+            .trim_end_matches('/')
+            != session.service
+    {
+        return false;
+    }
+    section.access_jwt = Some(access.to_string());
+    section.refresh_jwt = Some(refresh.to_string());
+    true
 }
 
 fn items<'a>(value: &'a Value, key: &str) -> &'a [Value] {
@@ -591,6 +639,138 @@ pub fn status(section: &BlueskyConfig) -> Vec<(&'static str, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_expired_write_keeps_the_refresh_rate_limit_and_is_not_replayed() {
+        use std::io::{BufRead, Read, Write};
+        use std::time::{Duration, Instant};
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let service = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for (status, body) in [
+                ("400 Bad Request", r#"{"error":"ExpiredToken"}"#),
+                ("429 Too Many Requests", r#"{"message":"try later"}"#),
+            ] {
+                let deadline = Instant::now() + Duration::from_secs(3);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(error)
+                            if error.kind() == std::io::ErrorKind::WouldBlock
+                                && Instant::now() < deadline =>
+                        {
+                            std::thread::sleep(Duration::from_millis(2))
+                        }
+                        other => panic!("missing expected request: {other:?}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                let mut reader = std::io::BufReader::new(&mut stream);
+                let mut request = String::new();
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse::<usize>().unwrap();
+                    }
+                    request.push_str(&line);
+                }
+                let mut bytes = vec![0; length];
+                reader.read_exact(&mut bytes).unwrap();
+                request.push_str(&String::from_utf8(bytes).unwrap());
+                requests.push(request);
+                write!(stream, "HTTP/1.1 {status}\r\nContent-Length: {}\r\nRetry-After: 30\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+            requests
+        });
+        let mut client = BlueskyClient::new(&BlueskyConfig {
+            service: Some(service),
+            handle: Some("ada.test".into()),
+            did: Some("did:plc:ada".into()),
+            access_jwt: Some("old-access".into()),
+            refresh_jwt: Some("refresh".into()),
+        });
+        client.http = Some(
+            Client::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(3))
+                .build()
+                .unwrap(),
+        );
+        let result = client.post(&Draft {
+            text: "hello".into(),
+            ..Draft::default()
+        });
+        assert!(matches!(
+            result,
+            Err(NetError::RateLimited {
+                net: Network::Bluesky,
+                retry_after: Some(30)
+            })
+        ));
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with("POST /xrpc/com.atproto.repo.createRecord "));
+        assert!(requests[0].contains(r#""$type":"app.bsky.feed.post""#));
+        assert!(requests[1].starts_with("POST /xrpc/com.atproto.server.refreshSession "));
+        assert!(requests[1].contains("Bearer refresh"));
+        assert_eq!(client.session().unwrap().access_jwt, "old-access");
+    }
+
+    #[test]
+    fn a_refresh_cannot_restore_a_logged_out_or_replaced_account() {
+        let original = BlueskyConfig {
+            did: Some("did:plc:ada".into()),
+            handle: Some("ada.test".into()),
+            access_jwt: Some("old-access".into()),
+            refresh_jwt: Some("old-refresh".into()),
+            ..BlueskyConfig::default()
+        };
+        let client = BlueskyClient::new(&original);
+        let session = client.session().unwrap();
+        let mut current = original.clone();
+        assert!(save_refresh(
+            &mut current,
+            session,
+            "new-access",
+            "new-refresh"
+        ));
+        assert_eq!(current.refresh_jwt.as_deref(), Some("new-refresh"));
+        assert!(!save_refresh(
+            &mut current,
+            session,
+            "stale-access",
+            "stale-refresh"
+        ));
+        assert_eq!(current.access_jwt.as_deref(), Some("new-access"));
+        let mut logged_out = BlueskyConfig::default();
+        assert!(!save_refresh(
+            &mut logged_out,
+            session,
+            "new-access",
+            "new-refresh"
+        ));
+        assert!(logged_out.access_jwt.is_none());
+        let mut switched = BlueskyConfig {
+            did: Some("did:plc:other".into()),
+            ..original
+        };
+        assert!(!save_refresh(
+            &mut switched,
+            session,
+            "new-access",
+            "new-refresh"
+        ));
+        assert_eq!(switched.did.as_deref(), Some("did:plc:other"));
+    }
 
     #[test]
     fn caps_follow_the_session_and_public_columns() {

@@ -63,7 +63,7 @@ Without a command, `SOCLI_AGENT=1 socli` prints the home feed as JSON, which is 
 | `socli whoami`, `socli auth status` | The accounts in use and what is configured |
 | `socli config list\|get\|set\|path\|themes`, `socli drafts [rm <n>]` | Settings and saved drafts |
 
-`--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon` (or `masto`), a comma list or `all`. Without it, `SOCLI_NET`, then `feed.networks`, then every network applies, and `post` uses the network set by `socli auth default`. A reply goes only to the parent post's network. `--count <n>` sets how many posts each network is asked for (15 by default; the demo ignores it and always returns its whole feed), and each X post returned is billed, so an agent should not page on X without a reason.
+`--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon` (or `masto`), a comma list or `all`. Naming `threads` answers `Waiting for Meta approval`, and `--net all` leaves Threads out. Without it, `SOCLI_NET`, then `feed.networks`, then every network applies, and `post` uses the network set by `socli auth default`. A reply goes only to the parent post's network. `--count <n>` sets how many posts each network is asked for (15 by default; the demo ignores it and always returns its whole feed), and each X post returned is billed, so an agent should not page on X without a reason.
 
 ## Scoped ids
 
@@ -248,9 +248,9 @@ Key order is alphabetical and is not part of the contract.
 
 `socli config themes` prints `{"themes": [{"name", "description", "variants"}]}` for every value `ui.theme` accepts, where `variants` is `["dark"]`, `["dark", "light"]` or empty for `auto`, `native`, `black` and `white`.
 
-`socli drafts` prints an array of drafts, empty when there are none (`[]`). Each draft has `index` (the number `socli drafts rm <index>` takes), `id`, `targets`, `text`, `created_at`, `updated_at`, and `reply_to` or `quote` when the draft is a reply or a quote. `drafts rm` prints `{"ok": true, "removed": <index>, "id": "…"}`. The demo run has no drafts, so these two shapes come from `src/main.rs` and not from a captured sample.
+`socli drafts` prints an array of drafts, empty when there are none (`[]`). Each draft has `index` (the number `socli drafts rm <index>` takes), `id`, `targets`, `text`, `created_at`, `updated_at`, and `reply_to` or `quote` when the draft is a reply or a quote. `drafts rm` prints `{"ok": true, "removed": <index>, "id": "…"}`. When an earlier send has no confirmed outcome, draft JSON also includes `sending` (the affected network slugs) and `warning`. Check those networks before posting again. The demo run has no drafts, so these two shapes come from `src/cli.rs` and not from a captured sample.
 
-Sign-in and sign-out commands print one object per account: `socli login <net>` prints `{"ok", "network", "handle", "url"}` (`handle` and `url` when known), and `socli logout <net|all>` prints an array of `{"network", "ok", "error"}` with `error` only on a failure. Those two shapes also come from `src/main.rs`, because running them would change a real configuration.
+Sign-in and sign-out commands print one object per account: `socli login <net>` prints `{"ok", "network", "handle", "url"}` (`handle` and `url` when known), and `socli logout <net|all>` prints an array of `{"network", "ok", "error"}` with `error` only on a failure. Those two shapes also come from `src/cli.rs`, because running them would change a real configuration.
 
 ### The help table
 
@@ -300,13 +300,14 @@ Keep tokens out of command lines and logs. Prefer the environment variables belo
 
 ## Signing in
 
-An agent can sign in to three networks without a person:
+An agent can sign in to Bluesky and Mastodon without a person:
 
 | Network | Command |
 | --- | --- |
 | Bluesky | `printf '%s\n' "$APP_PASSWORD" \| socli login bluesky --handle you.bsky.social --password-stdin`, or set `BLUESKY_HANDLE` and `BLUESKY_APP_PASSWORD` |
-| Threads | `socli login threads --token <token>`, or set `THREADS_ACCESS_TOKEN` |
 | Mastodon | `socli login mastodon --token <token> --server <host>`, or set `MASTODON_ACCESS_TOKEN` and `MASTODON_SERVER` |
+
+Threads answers `Waiting for Meta approval` and exits 1. In agent mode the line is `{"error":"Waiting for Meta approval"}`. Do not pass a token. `--net threads`, a comma list that names Threads, and `SOCLI_NET=threads` fail the same way. `--net all` leaves Threads out. That hold is outside `--demo`. `socli logout threads` still clears a stored token.
 
 X and dev/null need a person at a browser, and agent mode refuses their sign-ins with exit 2:
 
@@ -314,7 +315,7 @@ X and dev/null need a person at a browser, and agent mode refuses their sign-ins
 {"error":"signing in to X needs a person at a browser. Run socli login x in a terminal"}
 ```
 
-`socli login devnull` and `socli auth threads oauth` are refused the same way, and so is `socli login mastodon` without a token (a token comes from `--token` or `MASTODON_ACCESS_TOKEN`):
+`socli login devnull` is refused the same way, and so is `socli login mastodon` without a token (a token comes from `--token` or `MASTODON_ACCESS_TOKEN`):
 
 ```json
 {"error":"signing in to Mastodon needs a person at a browser. Run socli login mastodon in a terminal"}

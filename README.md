@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://socli.sh"><img src="https://img.shields.io/badge/socli.sh-0f1419?style=flat-square" alt="socli.sh" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" /></a>
-  <a href="https://github.com/massimodeluisa/socli"><img src="https://img.shields.io/badge/version-0.1.2-blue?style=flat-square" alt="version 0.1.2" /></a>
+  <a href="https://github.com/massimodeluisa/socli"><img src="https://img.shields.io/badge/version-0.1.3-blue?style=flat-square" alt="version 0.1.3" /></a>
   <a href="https://isready.ai"><img src="https://isready.ai/badge/socli.sh" alt="AI readiness" /></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Format-Agent_Skills-orange?style=flat-square" alt="Agent Skills format" /></a>
 </p>
@@ -105,6 +105,16 @@ brew tap massimodeluisa/tap
 brew install socli
 ```
 
+On Linux:
+
+```sh
+curl -fsSL https://socli.sh/install.sh | sh
+```
+
+That command reads the distribution, downloads the matching release file, checks `SHA256SUMS`, installs `socli`, and prints `socli` and `socli --demo`. Debian and Ubuntu get the `.deb`, RPM systems the `.rpm`, Alpine the `.apk`. Arch and Omarchy get the musl binary in `/usr/local/bin`.
+
+A release also includes a macOS installer disk image and Linux `.deb`, `.rpm`, and `.apk` packages for ARMv7, ARM64, x86, and x64. Those files are downloaded from the release. `apt upgrade`, `dnf upgrade`, and `apk upgrade` do not see them. [Install](https://socli.sh/docs/install.html) has the file names.
+
 Package-manager installation requires a [published release](https://github.com/massimodeluisa/socli/releases), and Homebrew Core publication is pending; the project tap supplies the formula. If no release is listed, install from source:
 
 ```sh
@@ -141,7 +151,7 @@ socli --demo
 
 [socli.sh](https://socli.sh) runs this same reader, compiled to WebAssembly, with the same keys and the same rails. With no account stored for that origin, the page opens the welcome screen. `/web/` is the reader on its own, at [socli.sh/web](https://socli.sh/web/).
 
-Bluesky, Mastodon, Threads and X sign in from that screen. X and Threads approve the app compiled into the build. A build with an empty app id says so, and does not ask you to create one. The X reader on socli.sh returns to `https://socli.sh/` from the homepage and to `https://socli.sh/web/` from the full-screen page. Threads returns to `https://socli.sh/web/`, then sends the code to `https://socli.sh/threads/token`, which holds the app secret. Threads does not accept an `http://` redirect, so a reader on this machine (`http://127.0.0.1:5174`) cannot finish that approval.
+Bluesky, Mastodon and X sign in from that screen. Threads shows Waiting for Meta approval and does not open a browser or call Meta. That hold is outside `--demo`. X approves the app compiled into the build. A build with an empty app id says so, and does not ask you to create one. The X reader on socli.sh returns to `https://socli.sh/` from the homepage and to `https://socli.sh/web/` from the full-screen page. The Threads return to `https://socli.sh/web/` and the exchange at `https://socli.sh/threads/token` stay unused while that hold is on.
 
 X on the page uses the official API, so For you is a search, and a like or a follow can be refused. The local docs server forwards only `api.x.com` for that exchange. A static host such as GitHub Pages does not. dev/null on the page opens the approval on dev-null.sh, and you paste the `devnull://` callback. GitHub SSH signing stays in the terminal. `socli login x` in a terminal still imports the browser session. The page keeps its config, tokens included, in that origin's local storage. Rich mode draws profile pictures and post images by loading each one from its URL. kitty, iTerm2 and sixel stay in the terminal. The welcome screen can still open the offline demo.
 
@@ -157,7 +167,7 @@ Each network has its own command. `socli auth status` shows what is configured a
 
 `socli login devnull` creates a device key and opens the browser. On macOS the window returns the result to SoCLI. On other platforms, or with `SOCLI_AUTH_BROWSER=manual`, paste the `devnull://` address back. Public reads work without that approval, and `socli auth devnull ssh` posts with the GitHub SSH key that signs your commits. See [docs/integration/devnull/auth.md](docs/integration/devnull/auth.md).
 
-`socli login threads` opens Threads and asks you to approve SoCLI. The terminal returns to `https://socli.sh/`, which sends the browser on to `http://127.0.0.1:8742/threads/callback`. The code goes to `https://socli.sh/threads/token` and comes back as a 60-day token. `socli login threads --token <token>` stores a token you already have. See [docs/integration/threads/auth.md](docs/integration/threads/auth.md).
+`socli login threads` answers Waiting for Meta approval and does not open a browser or call Meta. `socli logout threads` still clears a token stored in the config. See [docs/integration/threads/auth.md](docs/integration/threads/auth.md).
 
 `socli login mastodon` asks for your server (Enter keeps `mastodon.social`), registers SoCLI as an app there, opens the authorization page and asks you to paste the code. `--server <host>` or `MASTODON_SERVER` skips the question. `socli login mastodon --token <token>` stores a token you created under Preferences > Development with the scopes `read write`, and it needs no browser. See [docs/integration/mastodon/auth.md](docs/integration/mastodon/auth.md).
 
@@ -216,7 +226,7 @@ socli like x:1849213377
 socli delete x:1849213377 --yes
 ```
 
-Ids are scoped as `<network>:<native id>`, and a post link works in place of an id. `--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon` (or `masto`), a comma list, or `all`. Without it, SoCLI uses `SOCLI_NET`, then `feed.networks`, then every signed-in network. `post` uses `socli auth default`. `--dry-run` checks sign-in, capabilities and length, and sends nothing. `--json` prints an array of posts for a read, and an array of per-network results for a write. `<b>` and `<i>` in post text become Unicode bold and italic letters. `--raw` sends the text as typed.
+Ids are scoped as `<network>:<native id>`, and a post link works in place of an id. `--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon` (or `masto`), a comma list, or `all`. Naming `threads` answers Waiting for Meta approval, and `--net all` leaves Threads out. That hold is outside `--demo`. Without it, SoCLI uses `SOCLI_NET`, then `feed.networks`, then every signed-in network. `post` uses `socli auth default`. `--dry-run` checks sign-in, capabilities and length, and sends nothing. `--json` prints an array of posts for a read, and an array of per-network results for a write. `<b>` and `<i>` in post text become Unicode bold and italic letters. `--raw` sends the text as typed.
 
 `socli help` lists every command. `socli help <command>` shows one command's flags and examples. `socli help --json` returns that table as JSON. Beyond the examples above, the help page covers `user`, `notifications`, `bookmarks`, `ask`, `repost`, `bookmark`, `share`, `follow`, `whoami`, `auth`, `config`, `drafts`, and the undo form of each toggle (`unlike`, `unrepost`, `unbookmark`, `unfollow`).
 

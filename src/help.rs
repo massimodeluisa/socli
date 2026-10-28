@@ -371,7 +371,7 @@ const COMMANDS: &[Command] = &[
         arg: "<net>",
         group: Some(Group::Account),
         brief: "Sign in to a network",
-        summary: "Sign in to X, Bluesky, dev/null, Threads or Mastodon",
+        summary: "Sign in to X, Bluesky, dev/null or Mastodon. Threads answers Waiting for Meta approval",
         usage: &[(
             "socli login",
             "<net> [flags]",
@@ -419,8 +419,6 @@ const COMMANDS: &[Command] = &[
             "socli login bluesky",
             "socli login bluesky --handle <handle> --password-stdin",
             "socli login x --oauth --client-id <id>",
-            "socli login threads",
-            "socli login threads --token <token>",
             "socli login mastodon --server fosstodon.org",
         ],
     },

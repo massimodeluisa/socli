@@ -39,7 +39,7 @@ jobs:
         with:
           toolchain: 1.99.1
           components: rustfmt, clippy
-      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
   tests:
     name: tests (${{ matrix.os }})
@@ -63,6 +63,8 @@ jobs:
     name: wasm
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      RUSTFLAGS: -D warnings
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -80,11 +82,6 @@ jobs:
             echo "a native crate entered the wasm graph" >&2
             exit 1
           fi
-      # Warning ratchet: the historical wasm rustc warning count is 71.
-      # Do not fail on that count. The parent measures the wasm cargo check
-      # output and writes the ceiling here. Until that number is set, this
-      # job does not enforce a warning ceiling. Deny-level lints, including
-      # clippy::undocumented_unsafe_blocks, still fail the build.
       - name: Check wasm
         run: cargo check --locked --lib --no-default-features --target wasm32-unknown-unknown
       - name: Clippy wasm

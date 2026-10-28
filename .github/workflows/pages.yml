@@ -41,10 +41,14 @@ jobs:
             exit 1
           fi
       - name: Build the reader
+        env:
+          RUSTFLAGS: -D warnings
         run: |
           cargo build --locked --release --no-default-features --target wasm32-unknown-unknown --lib
           mkdir -p website/public/wasm
           wasm-opt -Oz target/wasm32-unknown-unknown/release/socli.wasm -o website/public/wasm/socli.wasm
+      - name: Exercise the compiled WASM reader
+        run: bun test scripts/wasm.test.ts
       - name: Install dependencies
         working-directory: website
         run: bun install --frozen-lockfile

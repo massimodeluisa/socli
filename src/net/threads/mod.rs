@@ -31,20 +31,39 @@ pub struct ThreadsClient {
     username: Option<String>,
 }
 
+fn resolved_section(section: &ThreadsConfig, env_token: Option<String>) -> (ThreadsConfig, bool) {
+    let token = env_token
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let Some(token) = token else {
+        return (section.clone(), false);
+    };
+    let same_token = section.access_token.as_deref().map(str::trim) == Some(token.as_str());
+    let resolved = if same_token {
+        ThreadsConfig {
+            access_token: Some(token),
+            ..section.clone()
+        }
+    } else {
+        ThreadsConfig {
+            access_token: Some(token),
+            ..ThreadsConfig::default()
+        }
+    };
+    (resolved, true)
+}
+
 impl ThreadsClient {
     /// A client when the `[threads]` section or `THREADS_ACCESS_TOKEN` holds a token.
     pub fn from_config(section: &ThreadsConfig) -> Option<Self> {
         let http = http::client().ok()?;
-        let env = std::env::var("THREADS_ACCESS_TOKEN")
-            .ok()
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty());
-        let token = match env {
-            Some(token) => token,
-            None => {
-                let stored = section.access_token.clone().filter(|t| !t.is_empty())?;
-                auth::auto_refresh(&http, section, stored)
-            }
+        let (section, overridden) =
+            resolved_section(section, std::env::var("THREADS_ACCESS_TOKEN").ok());
+        let stored = section.access_token.clone().filter(|t| !t.is_empty())?;
+        let token = if overridden {
+            stored
+        } else {
+            auth::auto_refresh(&http, &section, stored)
         };
         Some(ThreadsClient {
             http,
@@ -75,7 +94,7 @@ impl ThreadsClient {
     fn post_form(&self, path: &str, form: &[(&str, &str)]) -> Result<Value, NetError> {
         let mut fields = form.to_vec();
         fields.push(("access_token", self.token.as_str()));
-        send(self.http.post(format!("{API}{path}")).form(&fields))
+        send_with(self.http.post(format!("{API}{path}")).form(&fields), true)
     }
 
     /// The signed-in profile with a scoped id.
@@ -147,50 +166,78 @@ impl ThreadsClient {
 
     /// Text containers are normally ready at once; this only waits when Meta reports one still processing.
     fn wait_for_container(&self, creation_id: &str) -> Result<(), NetError> {
-        for attempt in 0..CONTAINER_POLLS {
-            let Ok(status) = self.get(
-                &format!("/{creation_id}"),
-                &[("fields", "status,error_message")],
-            ) else {
-                return Ok(());
-            };
-            match map::container(&status) {
-                map::Container::Ready => return Ok(()),
-                map::Container::Failed(reason) => {
-                    return Err(NetError::Http {
-                        net: Network::Threads,
-                        status: 400,
-                        message: format!("Threads could not prepare the post: {reason}. check the text and try again"),
-                    })
-                }
-                map::Container::Pending if attempt + 1 < CONTAINER_POLLS => {
-                    crate::clock::pause(Duration::from_secs(2));
-                }
-                map::Container::Pending => {}
-            }
-        }
-        Ok(())
+        wait_for_container_with(
+            || {
+                self.get(
+                    &format!("/{creation_id}"),
+                    &[("fields", "status,error_message")],
+                )
+            },
+            || crate::clock::pause(Duration::from_secs(2)),
+        )
     }
+}
+
+fn wait_for_container_with(
+    mut poll: impl FnMut() -> Result<Value, NetError>,
+    mut pause: impl FnMut(),
+) -> Result<(), NetError> {
+    for attempt in 0..CONTAINER_POLLS {
+        match map::container(&poll()?) {
+            map::Container::Ready => return Ok(()),
+            map::Container::Failed(reason) => {
+                return Err(NetError::Http {
+                    net: Network::Threads,
+                    status: 400,
+                    message: format!(
+                    "Threads could not prepare the post: {reason}. check the text and try again"
+                ),
+                })
+            }
+            map::Container::Pending if attempt + 1 < CONTAINER_POLLS => pause(),
+            map::Container::Pending => {}
+        }
+    }
+    Err(NetError::Other(
+        "Threads is still preparing the post. it was not published; try again later".into(),
+    ))
 }
 
 /// Sends a request and decodes the body, with the request URL kept out of every error.
 fn send(request: RequestBuilder) -> Result<Value, NetError> {
-    let response = request.send().map_err(transport)?;
+    send_with(request, false)
+}
+
+fn send_with(request: RequestBuilder, mutation: bool) -> Result<Value, NetError> {
+    let response = request
+        .send()
+        .map_err(|error| http::transport_error(Network::Threads, error, mutation))?;
     let status = response.status().as_u16();
     let retry_after = response
         .headers()
         .get(http::header::RETRY_AFTER)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.trim().parse().ok());
-    let body = response.text().map_err(transport)?;
-    map::decode(status, retry_after, &body)
-}
-
-fn transport(err: http::Error) -> NetError {
-    NetError::Other(format!(
-        "could not reach threads: {}. check your connection and try again",
-        err.without_url()
-    ))
+    let body = http::read_text(response).map_err(|message| {
+        if mutation && (200..300).contains(&status) {
+            NetError::OutcomeUnknown {
+                net: Network::Threads,
+                message,
+            }
+        } else {
+            NetError::Other(format!("could not read the Threads response: {message}"))
+        }
+    })?;
+    map::decode(status, retry_after, &body).map_err(|error| {
+        if mutation && (status >= 500 || matches!(error, NetError::Parse { .. })) {
+            NetError::OutcomeUnknown {
+                net: Network::Threads,
+                message: error.to_string(),
+            }
+        } else {
+            error
+        }
+    })
 }
 
 fn native(id: &str) -> Result<String, NetError> {
@@ -382,7 +429,10 @@ impl Provider for ThreadsClient {
         let creation_id = created_id(&self.post_form("/me/threads", &form)?)?;
         self.wait_for_container(&creation_id)?;
         let published = self.post_form("/me/threads_publish", &[("creation_id", &creation_id)])?;
-        let id = created_id(&published)?;
+        let id = created_id(&published).map_err(|error| NetError::OutcomeUnknown {
+            net: Network::Threads,
+            message: error.to_string(),
+        })?;
         let mut detail = self
             .get(
                 &format!("/{id}"),
@@ -401,10 +451,11 @@ impl Provider for ThreadsClient {
 
     fn delete(&mut self, id: &str) -> Result<(), NetError> {
         let id = native(id)?;
-        let body = send(
+        let body = send_with(
             self.http
                 .delete(format!("{API}/{id}"))
                 .query(&[("access_token", self.token.as_str())]),
+            true,
         )?;
         if body.get("success").and_then(Value::as_bool) == Some(false) {
             return Err(NetError::Other(
@@ -437,12 +488,15 @@ impl Provider for ThreadsClient {
 
 /// The `threads` rows of `socli auth status`, the token redacted.
 pub fn status(section: &ThreadsConfig) -> Vec<(&'static str, String)> {
-    let env = std::env::var("THREADS_ACCESS_TOKEN").ok();
-    let token = env.as_deref().or(section.access_token.as_deref());
-    let account = match (token, &section.username) {
-        (Some(_), Some(user)) => format!("@{user}"),
-        (Some(_), None) => "signed in".into(),
-        (None, _) => "not signed in".into(),
+    let (section, _) = resolved_section(section, std::env::var("THREADS_ACCESS_TOKEN").ok());
+    let token = section.access_token.as_deref();
+    let account = match Network::Threads.hold() {
+        Some(message) => message.to_string(),
+        None => match (token, &section.username) {
+            (Some(_), Some(user)) => format!("@{user}"),
+            (Some(_), None) => "signed in".into(),
+            (None, _) => "not signed in".into(),
+        },
     };
     vec![("account", account), ("token", config::redact(token))]
 }
@@ -450,6 +504,97 @@ pub fn status(section: &ThreadsConfig) -> Vec<(&'static str, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_environment_token_never_inherits_another_threads_accounts_metadata() {
+        let section = ThreadsConfig {
+            access_token: Some("token-a".into()),
+            user_id: Some("account-a".into()),
+            username: Some("ada".into()),
+            issued_at: Some(100),
+            expires_at: Some(200),
+            oauth_state: Some("state-a".into()),
+            oauth_redirect: Some("https://a.example/".into()),
+        };
+        let (changed, overridden) = resolved_section(&section, Some(" token-b ".into()));
+        assert!(overridden);
+        assert_eq!(changed.access_token.as_deref(), Some("token-b"));
+        assert!(changed.user_id.is_none() && changed.username.is_none());
+        assert!(changed.issued_at.is_none() && changed.expires_at.is_none());
+        assert!(changed.oauth_state.is_none() && changed.oauth_redirect.is_none());
+        let (same, overridden) = resolved_section(&section, Some(" token-a ".into()));
+        assert!(overridden);
+        assert_eq!(same, section);
+        let (stored, overridden) = resolved_section(&section, Some("  ".into()));
+        assert!(!overridden);
+        assert_eq!(stored, section);
+    }
+
+    #[test]
+    fn an_unready_container_never_reports_success() {
+        let mut polls = 0;
+        let mut pauses = 0;
+        let result = wait_for_container_with(
+            || {
+                polls += 1;
+                Ok(serde_json::json!({"status":"IN_PROGRESS"}))
+            },
+            || pauses += 1,
+        );
+        assert!(result.unwrap_err().to_string().contains("not published"));
+        assert_eq!(polls, CONTAINER_POLLS);
+        assert_eq!(pauses, CONTAINER_POLLS - 1);
+    }
+
+    #[test]
+    fn container_polling_preserves_connection_and_rate_limit_errors() {
+        let error = wait_for_container_with(
+            || {
+                Err(NetError::RateLimited {
+                    net: Network::Threads,
+                    retry_after: Some(60),
+                })
+            },
+            || panic!("a failed poll must not sleep or retry"),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            NetError::RateLimited {
+                retry_after: Some(60),
+                ..
+            }
+        ));
+        assert!(wait_for_container_with(
+            || Err(NetError::Other("offline".into())),
+            || panic!("a failed poll must not sleep or retry"),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn a_container_can_finish_on_a_later_poll() {
+        let mut polls = 0;
+        let mut pauses = 0;
+        let result = wait_for_container_with(
+            || {
+                polls += 1;
+                Ok(
+                    serde_json::json!({"status": if polls == 2 { "FINISHED" } else { "IN_PROGRESS" }}),
+                )
+            },
+            || pauses += 1,
+        );
+        assert!(result.is_ok());
+        assert_eq!((polls, pauses), (2, 1));
+        assert!(wait_for_container_with(
+            || Ok(serde_json::json!({"status":"ERROR","error_message":"rejected"})),
+            || panic!("a rejection must not sleep or retry"),
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("rejected"));
+    }
 
     #[test]
     fn caps_match_the_threads_feature_set() {

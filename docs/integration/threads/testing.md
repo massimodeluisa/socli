@@ -45,6 +45,8 @@ Remove the directory when you are done: `rm -r "$D"`.
 
 ## With an account
 
+The product currently refuses these live steps with `Waiting for Meta approval` and does not call Meta. They are the checks for when that hold is removed. `socli logout threads` still clears a stored token.
+
 These steps need a Meta app with the Threads use case and a Threads account that can use it. See [auth](auth.md) for the token. Posts you publish are real posts, so delete the test ones.
 
 1. Sign in with a token: `socli login threads --token <token> --app-secret <secret>`. SoCLI prints the account and "token valid until YYYY-MM-DD". Without `--app-secret` it prints "token lifetime unknown; add --app-secret to swap it for a 60-day token that renews itself" instead. A wrong token fails at the `GET /me` check.

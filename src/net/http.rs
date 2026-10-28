@@ -420,10 +420,11 @@ mod imp {
         len_bytes.copy_from_slice(&bytes[at..at + 4]);
         let body_len = u32::from_le_bytes(len_bytes) as usize;
         at += 4;
-        if at + body_len > bytes.len() {
-            return Err(Error::new("the browser response was cut off"));
-        }
-        let body = bytes[at..at + body_len].to_vec();
+        let end = at
+            .checked_add(body_len)
+            .filter(|end| *end <= bytes.len())
+            .ok_or_else(|| Error::new("the browser response was cut off"))?;
+        let body = bytes[at..end].to_vec();
         if status == 0 {
             let message = String::from_utf8_lossy(&body).trim().to_string();
             return Err(Error::new(if message.is_empty() {
@@ -506,6 +507,47 @@ fn json_string(value: &Value) -> String {
         Value::Bool(flag) => flag.to_string(),
         Value::Null => String::new(),
         other => other.to_string(),
+    }
+}
+
+/// Preserves uncertain mutation outcomes while removing request URLs from diagnostics.
+pub fn transport_error(net: super::Network, error: Error, mutation: bool) -> NetError {
+    #[cfg(not(target_arch = "wasm32"))]
+    let uncertain = mutation && !error.is_connect() && !error.is_builder();
+    #[cfg(target_arch = "wasm32")]
+    let uncertain = mutation;
+    let message = format!("network: {}", error.without_url());
+    if uncertain {
+        NetError::OutcomeUnknown { net, message }
+    } else {
+        NetError::Other(message)
+    }
+}
+
+const MAX_RESPONSE_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Reads at most 8 MiB so a malformed API response cannot exhaust the process memory.
+pub fn read_text(response: Response) -> Result<String, String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        response
+            .take(MAX_RESPONSE_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| "could not read the network response".to_string())?;
+        if bytes.len() as u64 > MAX_RESPONSE_BYTES {
+            return Err("the response is larger than 8 MB".into());
+        }
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let text = response.text().map_err(|error| error.to_string())?;
+        if text.len() as u64 > MAX_RESPONSE_BYTES {
+            return Err("the response is larger than 8 MB".into());
+        }
+        Ok(text)
     }
 }
 

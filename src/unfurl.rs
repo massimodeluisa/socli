@@ -1,13 +1,19 @@
 //! Link previews: a page's Open Graph tags and image, fetched in the background with size, time and redirect limits, from public addresses only.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+#[cfg(any(test, feature = "native"))]
 use std::io::Read;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
+#[cfg(any(test, feature = "native"))]
+use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
+#[cfg(feature = "native")]
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 #[cfg(feature = "native")]
 use std::thread;
+#[cfg(any(test, feature = "native"))]
 use std::time::Duration;
 
 #[cfg(feature = "native")]
@@ -20,13 +26,20 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE};
 use reqwest::redirect::Policy;
 use url::Url;
 
+#[cfg(any(test, feature = "native"))]
 const MAX_BYTES: usize = 512 * 1024;
+#[cfg(any(test, feature = "native"))]
 const CHUNK: usize = 8 * 1024;
+#[cfg(any(test, feature = "native"))]
 const TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(any(test, feature = "native"))]
 const MAX_REDIRECTS: usize = 5;
 const HEAD_END: &[u8] = b"</head>";
+#[cfg(any(test, feature = "native"))]
 const IMAGE_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(any(test, feature = "native"))]
 const MAX_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
+#[cfg(any(test, feature = "native"))]
 const WORKERS: usize = 2;
 
 /// What a page's Open Graph tags say about it.
@@ -92,7 +105,7 @@ pub fn fetch(client: &Client, page: &str) -> Result<Card, String> {
         .header(ACCEPT, "text/html,application/xhtml+xml")
         .timeout(TIMEOUT)
         .send()
-        .map_err(|error| format!("couldn't fetch the page: {error}"))?;
+        .map_err(|error| format!("couldn't fetch the page: {}", error.without_url()))?;
     let status = response.status();
     if !status.is_success() {
         return Err(format!("the page answered {}", status.as_u16()));
@@ -154,7 +167,7 @@ pub fn image(client: &Client, url: &str) -> Result<Vec<u8>, String> {
         .header(ACCEPT, "image/*")
         .timeout(IMAGE_TIMEOUT)
         .send()
-        .map_err(|error| format!("couldn't fetch the image: {error}"))?;
+        .map_err(|error| format!("couldn't fetch the image: {}", error.without_url()))?;
     let status = response.status();
     if !status.is_success() {
         return Err(format!("the image answered {}", status.as_u16()));
@@ -254,6 +267,11 @@ impl Unfurls {
 
 impl Drop for Unfurls {
     fn drop(&mut self) {
+        let _pages = self
+            .queue
+            .pages
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         self.queue.closed.store(true, Ordering::SeqCst);
         self.queue.wake.notify_all();
     }

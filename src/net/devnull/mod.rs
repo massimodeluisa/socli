@@ -19,7 +19,9 @@ use serde_json::{json, Value};
 use ssh_key::PrivateKey;
 
 use crate::config::{self, DevnullConfig};
-use crate::model::{Metrics, Page, Post, User};
+#[cfg(feature = "native")]
+use crate::model::Metrics;
+use crate::model::{Page, Post, User};
 use crate::net::http::{Client, Method, Response};
 use crate::net::{http, scoped, split, Caps, Draft, FeedKind, NetError, Network, Provider};
 
@@ -46,6 +48,7 @@ pub enum Access {
 pub struct DevnullClient {
     access: Access,
     username: Option<String>,
+    #[cfg(feature = "native")]
     device_key: Option<String>,
     ssh_key: Option<String>,
     http: Option<Client>,
@@ -64,6 +67,7 @@ impl DevnullClient {
         DevnullClient {
             access,
             username: section.username.clone(),
+            #[cfg(feature = "native")]
             device_key: section.device_key.clone(),
             ssh_key: section.ssh_key.clone().filter(|k| !k.is_empty()),
             http: None,
@@ -76,6 +80,7 @@ impl DevnullClient {
         DevnullClient {
             access: Access::Public,
             username: None,
+            #[cfg(feature = "native")]
             device_key: None,
             ssh_key: None,
             http: None,
@@ -160,7 +165,9 @@ impl DevnullClient {
             }
             let parent: One<Commit> = match self.get(&["commits", &parent], &[]) {
                 Ok(parent) => parent,
-                Err(NetError::Http { .. }) => break,
+                Err(NetError::Http {
+                    status: 404 | 410, ..
+                }) => break,
                 Err(err) => return Err(err),
             };
             parent_id = parent.data.parent_id.clone();
@@ -191,13 +198,21 @@ impl DevnullClient {
             body["quoted_commit_id"] = json!(native(quoted)?);
         }
         let created: One<Commit> =
-            api::json(self.send(Method::POST, &["commits"], &[], Some(&body))?)?;
+            api::json(self.send(Method::POST, &["commits"], &[], Some(&body))?).map_err(
+                |error| NetError::OutcomeUnknown {
+                    net: Network::Devnull,
+                    message: error.to_string(),
+                },
+            )?;
         let id = scoped(Network::Devnull, &created.data.id);
         map::page(vec![created.data], None)
             .posts
             .into_iter()
             .find(|p| p.id == id)
-            .ok_or_else(|| NetError::Other("dev/null did not return the new commit".into()))
+            .ok_or_else(|| NetError::OutcomeUnknown {
+                net: Network::Devnull,
+                message: "dev/null did not return the new commit".into(),
+            })
     }
 
     fn post_with_ssh(&mut self, draft: &Draft, key_line: &str) -> Result<Post, NetError> {
@@ -216,12 +231,11 @@ impl DevnullClient {
             let reply_to = draft.reply_to.as_deref().map(native).transpose()?;
             let client = self.client()?;
             let answer = ssh::commit(&client, key_line, reply_to.unwrap_or(""), &draft.text)?;
-            let (url, id, username) = ssh::committed(&answer).ok_or_else(|| {
-                NetError::Other(format!(
-                    "dev/null answered without a commit link: {}",
-                    answer.trim()
-                ))
-            })?;
+            let (url, id, username) =
+                ssh::committed(&answer).ok_or_else(|| NetError::OutcomeUnknown {
+                    net: Network::Devnull,
+                    message: "dev/null answered without a commit link".into(),
+                })?;
             if self.username.as_deref() != Some(username.as_str()) {
                 let saved = username.clone();
                 // The commit is already posted, so a config that cannot be written must not turn it into an error.

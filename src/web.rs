@@ -708,6 +708,13 @@ mod ffi {
             return crate::net::mastodon::finish_page(code, state);
         }
         if !state.is_empty() && cfg.threads.oauth_state.as_deref() == Some(state) {
+            if let Some(message) = crate::net::Network::Threads.hold() {
+                let _ = crate::config::update(|cfg| {
+                    cfg.threads.oauth_state = None;
+                    cfg.threads.oauth_redirect = None;
+                });
+                return Err(message.into());
+            }
             return crate::net::threads::finish_page(code, state);
         }
         let _ = crate::config::update(|cfg| {

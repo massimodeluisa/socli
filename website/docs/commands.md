@@ -37,7 +37,7 @@ Coding agents get JSON by default and never open prompts. `--print` selects text
 
 ## Networks and targets
 
-`--net` accepts `x`, `bluesky`, `devnull`, `threads`, `mastodon`, a comma-separated list or `all`. Aliases are `twitter`, `bsky`, `dev/null`, `dev-null` and `masto`. Global options can appear before or after a command.
+`--net` accepts `x`, `bluesky`, `devnull`, `threads`, `mastodon`, a comma-separated list or `all`. Aliases are `twitter`, `bsky`, `dev/null`, `dev-null` and `masto`. Naming `threads`, including in a comma list, answers Waiting for Meta approval. `--net all` leaves Threads out. That hold is outside `--demo`. Global options can appear before or after a command.
 
 For reads, scope comes from `--net`, then `SOCLI_NET`, then `feed.networks` in the configuration, then the available signed-in networks. Public search, profile and thread reads can use an explicitly named network without a session where its API allows it; [Networks](networks.html) lists the restrictions.
 
@@ -138,7 +138,7 @@ socli view "$post_id" --json
 | `socli login x` | `--browser <name>`, `--profile <name>` for browser sessions; `--oauth`, `--client-id <id>`, `--client-secret <secret>`, `--scopes <list>`, `--port <n>` for OAuth (port defaults to `8741`). |
 | `socli login bluesky` | `--handle <handle>`, `--service <url>`, `--password-stdin` (requires `--handle`). |
 | `socli login devnull` | `--device-name <name>`. |
-| `socli login threads` | `--token <token>`, `--app-secret <secret>`. |
+| `socli login threads` | Answers Waiting for Meta approval. `--token` and `--app-secret` are not used while that hold is on. |
 | `socli login mastodon` | `--server <host>`, `--token <token>`. |
 
 The [Sign in](login.html) page explains prerequisites, prompts, environment variables and browser flows.
@@ -152,8 +152,8 @@ The [Sign in](login.html) page explains prerequisites, prompts, environment vari
 | `socli auth x token` | Required `--access-token <token>`; optional `--user-id <id>`, `--username <name>`, `--refresh-token <token>`. Store an existing user token. |
 | `socli auth x bearer <token>` | Store an app-only bearer for public reads. |
 | `socli auth devnull ssh` | Optional `--key <path>`. Select the GitHub SSH key used to sign posts. |
-| `socli auth threads oauth` | Required `--app-id <id>`, `--app-secret <secret>`, `--redirect-uri <url>`; optional `--scopes <list>`. Authorize through the browser. |
-| `socli auth threads refresh` | Refresh a long-lived token. |
+| `socli auth threads oauth` | Answers Waiting for Meta approval. Does not open a browser while that hold is on. |
+| `socli auth threads refresh` | Answers Waiting for Meta approval. |
 
 ## Configuration and drafts
 

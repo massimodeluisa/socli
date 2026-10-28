@@ -11,7 +11,7 @@ use crate::config::{self, XConfig};
 use crate::net::pkce::{code_challenge, code_verifier};
 
 pub const DEFAULT_SCOPES: &str =
-    "tweet.read tweet.write users.read bookmark.read bookmark.write offline.access";
+    "tweet.read tweet.write users.read like.write follows.write bookmark.read bookmark.write offline.access";
 
 pub const DEFAULT_LATEST_QUERY: &str = "lang:en -is:retweet";
 
@@ -87,21 +87,56 @@ fn overlay(creds: &mut Credentials, env: impl Fn(&str) -> Option<String>) {
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty())
     };
-    let fields: [(&str, &mut Option<String>); 9] = [
+    let fields: [(&str, &mut Option<String>); 3] = [
         ("X_CLIENT_ID", &mut creds.client_id),
         ("X_CLIENT_SECRET", &mut creds.client_secret),
-        ("X_ACCESS_TOKEN", &mut creds.access_token),
-        ("X_REFRESH_TOKEN", &mut creds.refresh_token),
-        ("X_USER_ID", &mut creds.user_id),
-        ("X_USERNAME", &mut creds.username),
         ("X_BEARER_TOKEN", &mut creds.bearer_token),
-        ("X_AUTH_TOKEN", &mut creds.auth_token),
-        ("X_CT0", &mut creds.ct0),
     ];
     for (key, field) in fields {
         if let Some(v) = value(key) {
             *field = Some(v);
         }
+    }
+    let access = value("X_ACCESS_TOKEN");
+    let refresh = value("X_REFRESH_TOKEN");
+    let auth = value("X_AUTH_TOKEN");
+    let ct0 = value("X_CT0");
+    let browser = auth.is_some() && ct0.is_some();
+    if browser || (access.is_none() && (auth.is_some() || ct0.is_some())) {
+        if creds.auth_token != auth || creds.ct0 != ct0 {
+            creds.user_id = None;
+            creds.username = None;
+        }
+        creds.auth_token = auth;
+        creds.ct0 = ct0;
+        creds.access_token = None;
+        creds.refresh_token = None;
+        creds.expires_at = None;
+    } else if let Some(access) = access {
+        // An environment token is one session, not a replacement access token for a stored account.
+        if creds.access_token.as_deref() != Some(access.as_str()) {
+            creds.refresh_token = None;
+            creds.expires_at = None;
+            creds.user_id = None;
+            creds.username = None;
+        } else if creds.uses_web() {
+            creds.user_id = None;
+            creds.username = None;
+        }
+        creds.access_token = Some(access);
+        creds.auth_token = None;
+        creds.ct0 = None;
+        if let Some(refresh) = refresh {
+            creds.refresh_token = Some(refresh);
+        }
+    } else if let Some(refresh) = refresh {
+        creds.refresh_token = Some(refresh);
+    }
+    if let Some(user_id) = value("X_USER_ID") {
+        creds.user_id = Some(user_id);
+    }
+    if let Some(username) = value("X_USERNAME") {
+        creds.username = Some(username);
     }
 }
 
@@ -160,15 +195,12 @@ pub fn save_token(
 ) -> Result<(), String> {
     config::update(|cfg| {
         cfg.x.access_token = Some(access_token);
-        if user_id.is_some() {
-            cfg.x.user_id = user_id;
-        }
-        if username.is_some() {
-            cfg.x.username = username;
-        }
-        if refresh_token.is_some() {
-            cfg.x.refresh_token = refresh_token;
-        }
+        cfg.x.user_id = user_id;
+        cfg.x.username = username;
+        cfg.x.refresh_token = refresh_token;
+        cfg.x.expires_at = None;
+        cfg.x.auth_token = None;
+        cfg.x.ct0 = None;
     })?;
     Ok(())
 }
@@ -365,10 +397,8 @@ fn oauth(
         &code,
     )?;
     creds.access_token = Some(token.access_token.clone());
-    if let Some(refresh) = &token.refresh_token {
-        creds.refresh_token = Some(refresh.clone());
-    }
-    creds.expires_at = token.expires_in.map(|secs| now_secs() + secs);
+    creds.refresh_token = token.refresh_token.clone();
+    creds.expires_at = token.expires_in.map(|secs| now_secs().saturating_add(secs));
     creds.client_id = Some(client_id);
     // The profile read has to be this token. Leftover cookies would answer for the old account.
     creds.auth_token = None;
@@ -431,20 +461,13 @@ fn exchange(
     let response = req
         .form(&params)
         .send()
-        .map_err(|e| format!("token request: {e}"))?;
-    let status = response.status();
-    let text = response.text().map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        return Err(format!(
-            "token exchange failed ({}): {text}",
-            status.as_u16()
-        ));
-    }
-    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+        .map_err(|e| format!("token request: {}", e.without_url()))?;
+    let value = read_token_response(response, "token exchange")?;
     let access_token = value
         .get("access_token")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| format!("no access_token in {text}"))?
+        .filter(|token| !token.trim().is_empty())
+        .ok_or_else(|| "X token response had no access_token".to_string())?
         .to_string();
     Ok(TokenResponse {
         access_token,
@@ -458,6 +481,7 @@ fn exchange(
 
 /// Trades the refresh token for a new access token and saves both.
 pub fn refresh(creds: &mut Credentials) -> Result<(), String> {
+    let previous = creds.clone();
     let refresh_token = creds
         .refresh_token
         .clone()
@@ -476,48 +500,126 @@ pub fn refresh(creds: &mut Credentials) -> Result<(), String> {
     if let Some(secret) = creds.client_secret.as_deref() {
         req = req.basic_auth(&client_id, Some(secret));
     }
-    let response = req.form(&params).send().map_err(|e| e.to_string())?;
-    let status = response.status();
-    let text = response.text().map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        return Err(format!("refresh failed ({}): {text}", status.as_u16()));
-    }
-    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let response = req
+        .form(&params)
+        .send()
+        .map_err(|e| e.without_url().to_string())?;
+    let value = read_token_response(response, "token refresh")?;
     creds.access_token = Some(
         value
             .get("access_token")
             .and_then(|v| v.as_str())
+            .filter(|token| !token.trim().is_empty())
             .ok_or_else(|| "refresh response had no access_token".to_string())?
             .to_string(),
     );
-    if let Some(next) = value.get("refresh_token").and_then(|v| v.as_str()) {
+    if let Some(next) = value
+        .get("refresh_token")
+        .and_then(|v| v.as_str())
+        .filter(|token| !token.trim().is_empty())
+    {
         creds.refresh_token = Some(next.to_string());
     }
-    if let Some(secs) = value.get("expires_in").and_then(|v| v.as_i64()) {
-        creds.expires_at = Some(now_secs() + secs);
-    }
-    let (access, refresh, expires) = (
-        creds.access_token.clone(),
-        creds.refresh_token.clone(),
-        creds.expires_at,
-    );
+    creds.expires_at = value
+        .get("expires_in")
+        .and_then(|v| v.as_i64())
+        .map(|secs| now_secs().saturating_add(secs));
     config::update(|cfg| {
-        cfg.x.access_token = access;
-        cfg.x.refresh_token = refresh;
-        cfg.x.expires_at = expires;
+        store_refreshed_session(&mut cfg.x, &previous, creds);
     })?;
     Ok(())
 }
 
+fn read_token_response(
+    response: crate::net::http::Response,
+    operation: &str,
+) -> Result<serde_json::Value, String> {
+    let status = response.status();
+    let text = crate::net::http::read_text(response)?;
+    if !status.is_success() {
+        return Err(token_failure(operation, status.as_u16(), &text));
+    }
+    serde_json::from_str(&text)
+        .map_err(|_| "X returned an unreadable token response. run `socli login x` again".into())
+}
+
+fn token_failure(operation: &str, status: u16, text: &str) -> String {
+    let value = serde_json::from_str::<serde_json::Value>(text).ok();
+    // OAuth error descriptions and unknown fields can echo submitted secrets.
+    let code = value
+        .as_ref()
+        .and_then(|value| value.get("error"))
+        .and_then(|value| value.as_str())
+        .filter(|code| {
+            matches!(
+                *code,
+                "invalid_request"
+                    | "invalid_client"
+                    | "invalid_grant"
+                    | "unauthorized_client"
+                    | "unsupported_grant_type"
+                    | "invalid_scope"
+                    | "access_denied"
+                    | "server_error"
+                    | "temporarily_unavailable"
+            )
+        });
+    let next = if status == 429 || status >= 500 {
+        "try again later"
+    } else {
+        "run `socli login x` again"
+    };
+    match code {
+        Some(code) => format!("{operation} failed ({status}, {code}). {next}"),
+        None => format!("{operation} failed ({status}). {next}"),
+    }
+}
+
+fn store_refreshed_session(section: &mut XConfig, previous: &Credentials, refreshed: &Credentials) {
+    // A refresh must not replace a later login, or save credentials supplied only by the shell.
+    if section.access_token == previous.access_token
+        && section.refresh_token == previous.refresh_token
+        && section.client_id == previous.client_id
+    {
+        section.access_token = refreshed.access_token.clone();
+        section.refresh_token = refreshed.refresh_token.clone();
+        section.expires_at = refreshed.expires_at;
+    }
+}
+
 fn accept_code(listener: &TcpListener) -> Result<(String, String), String> {
-    let (mut stream, _) = listener
-        .accept()
-        .map_err(|e| format!("waiting for the browser: {e}"))?;
+    let mut stream = wait_for_callback(listener, std::time::Duration::from_secs(180))?;
     stream
-        .set_read_timeout(Some(std::time::Duration::from_secs(180)))
-        .ok();
+        .set_nonblocking(false)
+        .map_err(|error| format!("reading the browser callback: {error}"))?;
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .map_err(|error| format!("reading the browser callback: {error}"))?;
+    stream
+        .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+        .map_err(|error| format!("answering the browser callback: {error}"))?;
     let mut buf = [0u8; 8192];
-    let n = stream.read(&mut buf).map_err(|e| e.to_string())?;
+    let mut n = 0;
+    let started = std::time::Instant::now();
+    while !buf[..n].windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+        let remaining = std::time::Duration::from_secs(5).saturating_sub(started.elapsed());
+        if remaining.is_zero() {
+            return Err("the browser callback timed out. run `socli login x` again".into());
+        }
+        stream
+            .set_read_timeout(Some(remaining))
+            .map_err(|error| format!("reading the browser callback: {error}"))?;
+        if n == buf.len() {
+            return Err("the browser callback was too large. run `socli login x` again".into());
+        }
+        let read = stream.read(&mut buf[n..]).map_err(|_| {
+            "could not read the browser callback. run `socli login x` again".to_string()
+        })?;
+        if read == 0 {
+            return Err("the browser callback was cut off. run `socli login x` again".into());
+        }
+        n += read;
+    }
     let req = String::from_utf8_lossy(&buf[..n]);
     let first = req.lines().next().unwrap_or("");
     let path = first.split_whitespace().nth(1).unwrap_or("");
@@ -529,7 +631,11 @@ fn accept_code(listener: &TcpListener) -> Result<(String, String), String> {
     if let Some(error) = error {
         let body = page("X did not grant access. You can close this tab.");
         let _ = write_http(&mut stream, &body);
-        return Err(format!("authorization failed: {error}"));
+        return Err(if error == "access_denied" {
+            "X sign-in was cancelled. run `socli login x` to try again".into()
+        } else {
+            "X did not grant access. run `socli login x` again".into()
+        });
     }
     let code = fake
         .query_pairs()
@@ -543,9 +649,32 @@ fn accept_code(listener: &TcpListener) -> Result<(String, String), String> {
         .unwrap_or_default();
     let _ = write_http(
         &mut stream,
-        &page("signed in. close this tab and go back to the terminal."),
+        &page("The browser callback arrived. Return to the terminal to finish signing in."),
     );
     Ok((code, state))
+}
+
+fn wait_for_callback(
+    listener: &TcpListener,
+    timeout: std::time::Duration,
+) -> Result<std::net::TcpStream, String> {
+    listener
+        .set_nonblocking(true)
+        .map_err(|error| format!("waiting for the browser: {error}"))?;
+    let start = std::time::Instant::now();
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => return Ok(stream),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(format!("waiting for the browser: {error}")),
+        }
+        let remaining = timeout.saturating_sub(start.elapsed());
+        if remaining.is_zero() {
+            return Err("X sign-in timed out. run `socli login x` again".into());
+        }
+        std::thread::sleep(remaining.min(std::time::Duration::from_millis(100)));
+    }
 }
 
 fn write_http(stream: &mut impl Write, body: &str) -> std::io::Result<()> {
@@ -809,7 +938,7 @@ pub fn finish_page(code: &str, got_state: &str) -> Result<(), String> {
     creds.client_secret = None;
     creds.access_token = Some(token.access_token);
     creds.refresh_token = token.refresh_token;
-    creds.expires_at = token.expires_in.map(|secs| now_secs() + secs);
+    creds.expires_at = token.expires_in.map(|secs| now_secs().saturating_add(secs));
     creds.auth_token = None;
     creds.ct0 = None;
     creds.username = None;
@@ -828,6 +957,122 @@ pub fn finish_page(code: &str, got_state: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_abandoned_browser_sign_in_has_a_deadline() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let error = wait_for_callback(&listener, std::time::Duration::ZERO).unwrap_err();
+        assert!(error.contains("timed out"));
+        assert!(error.contains("socli login x"));
+    }
+
+    #[test]
+    fn a_fragmented_browser_callback_is_read_completely() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let sender = std::thread::spawn(move || {
+            let mut stream = std::net::TcpStream::connect(addr).unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .unwrap();
+            stream.write_all(b"GET /callback?code=approved").unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            stream
+                .write_all(b"&state=nonce HTTP/1.1\r\nHost: localhost\r\n\r\n")
+                .unwrap();
+            let mut response = String::new();
+            stream.read_to_string(&mut response).unwrap();
+            assert!(response.contains("finish signing in"));
+        });
+        let (code, state) = accept_code(&listener).unwrap();
+        assert_eq!(code, "approved");
+        assert_eq!(state, "nonce");
+        sender.join().unwrap();
+    }
+
+    #[test]
+    fn token_rejection_diagnostics_never_echo_response_secrets() {
+        for body in [
+            r#"{"error":"invalid_grant","error_description":"secret-refresh-token","access_token":"secret-access-token"}"#,
+            r#"{"error":"secret-refresh-token"}"#,
+            "<html>secret-refresh-token</html>",
+        ] {
+            let error = token_failure("token refresh", 400, body);
+            assert!(error.contains("400"));
+            assert!(!error.contains("secret-"));
+        }
+        assert!(
+            token_failure("token refresh", 400, r#"{"error":"invalid_grant"}"#)
+                .contains("invalid_grant")
+        );
+        assert!(token_failure("token refresh", 503, "").contains("try again later"));
+    }
+
+    #[test]
+    fn default_scopes_include_the_documented_like_and_follow_permissions() {
+        let scopes: Vec<_> = DEFAULT_SCOPES.split_whitespace().collect();
+        assert!(scopes.contains(&"like.write"));
+        assert!(scopes.contains(&"follows.write"));
+    }
+
+    #[test]
+    fn refresh_only_replaces_the_session_that_was_refreshed() {
+        let previous = Credentials {
+            access_token: Some("old-access".into()),
+            refresh_token: Some("old-refresh".into()),
+            client_id: Some("client".into()),
+            ..Credentials::default()
+        };
+        let refreshed = Credentials {
+            access_token: Some("new-access".into()),
+            refresh_token: Some("new-refresh".into()),
+            expires_at: Some(900),
+            ..previous.clone()
+        };
+        let mut stored = XConfig {
+            access_token: previous.access_token.clone(),
+            refresh_token: previous.refresh_token.clone(),
+            client_id: previous.client_id.clone(),
+            ..XConfig::default()
+        };
+        store_refreshed_session(&mut stored, &previous, &refreshed);
+        assert_eq!(stored.access_token, refreshed.access_token);
+        assert_eq!(stored.refresh_token, refreshed.refresh_token);
+        assert_eq!(stored.expires_at, Some(900));
+
+        stored.access_token = Some("another-account".into());
+        store_refreshed_session(&mut stored, &previous, &refreshed);
+        assert_eq!(stored.access_token.as_deref(), Some("another-account"));
+
+        let mut empty = XConfig::default();
+        store_refreshed_session(&mut empty, &previous, &refreshed);
+        assert!(empty.access_token.is_none());
+        assert!(empty.refresh_token.is_none());
+    }
+
+    #[test]
+    fn importing_a_token_replaces_the_previous_account_and_auth_method() {
+        with_config(|| {
+            config::update(|cfg| {
+                cfg.x.auth_token = Some("old-cookie".into());
+                cfg.x.ct0 = Some("old-csrf".into());
+                cfg.x.user_id = Some("old-user".into());
+                cfg.x.username = Some("old-name".into());
+                cfg.x.refresh_token = Some("old-refresh".into());
+                cfg.x.expires_at = Some(1);
+            })
+            .unwrap();
+            save_token("imported-token".into(), None, None, None).unwrap();
+            let saved = config::load().unwrap().x;
+            assert_eq!(saved.access_token.as_deref(), Some("imported-token"));
+            assert!(saved.auth_token.is_none());
+            assert!(saved.ct0.is_none());
+            assert!(saved.user_id.is_none());
+            assert!(saved.username.is_none());
+            assert!(saved.refresh_token.is_none());
+            assert!(saved.expires_at.is_none());
+        });
+    }
 
     #[test]
     fn two_x_accounts_are_listed_before_a_different_one() {
@@ -986,7 +1231,118 @@ mod tests {
             (key == "X_ACCESS_TOKEN").then(|| " from-env ".to_string())
         });
         assert_eq!(creds.access_token.as_deref(), Some("from-env"));
-        assert_eq!(creds.username.as_deref(), Some("mina"));
+        assert!(creds.username.is_none());
+    }
+
+    fn stored_oauth() -> Credentials {
+        Credentials {
+            access_token: Some("stored-access".into()),
+            refresh_token: Some("stored-refresh".into()),
+            expires_at: Some(900),
+            user_id: Some("stored-user".into()),
+            username: Some("stored-name".into()),
+            ..Credentials::default()
+        }
+    }
+
+    #[test]
+    fn a_changed_environment_access_token_cannot_refresh_as_the_stored_account() {
+        let mut creds = stored_oauth();
+        creds.auth_token = Some("stored-cookie".into());
+        creds.ct0 = Some("stored-csrf".into());
+        overlay(&mut creds, |key| {
+            (key == "X_ACCESS_TOKEN").then(|| "environment-access".into())
+        });
+        assert!(!creds.uses_web());
+        assert!(creds.refresh_token.is_none());
+        assert!(creds.expires_at.is_none());
+        assert!(creds.user_id.is_none());
+        assert!(creds.username.is_none());
+        let mut client = super::super::XClient::new(creds).unwrap();
+        let calls = std::cell::Cell::new(0);
+        let result: Result<(), crate::net::NetError> = client.call(|_| {
+            calls.set(calls.get() + 1);
+            Err(super::super::client::ApiError::Failed {
+                status: 401,
+                detail: "expired environment token".into(),
+                hint: String::new(),
+            })
+        });
+        assert!(matches!(
+            result,
+            Err(crate::net::NetError::Http { status: 401, .. })
+        ));
+        assert_eq!(calls.get(), 1);
+        assert_eq!(
+            client.credentials().access_token.as_deref(),
+            Some("environment-access")
+        );
+    }
+
+    #[test]
+    fn an_environment_oauth_bundle_uses_only_its_explicit_account_metadata() {
+        let mut creds = stored_oauth();
+        overlay(&mut creds, |key| match key {
+            "X_ACCESS_TOKEN" => Some("environment-access".into()),
+            "X_REFRESH_TOKEN" => Some("environment-refresh".into()),
+            "X_USER_ID" => Some("environment-user".into()),
+            "X_USERNAME" => Some("environment-name".into()),
+            _ => None,
+        });
+        assert_eq!(creds.refresh_token.as_deref(), Some("environment-refresh"));
+        assert_eq!(creds.user_id.as_deref(), Some("environment-user"));
+        assert_eq!(creds.username.as_deref(), Some("environment-name"));
+        assert!(creds.expires_at.is_none());
+    }
+
+    #[test]
+    fn the_same_environment_oauth_token_keeps_its_matching_stored_metadata() {
+        let mut creds = stored_oauth();
+        overlay(&mut creds, |key| {
+            (key == "X_ACCESS_TOKEN").then(|| "stored-access".into())
+        });
+        assert_eq!(creds.refresh_token.as_deref(), Some("stored-refresh"));
+        assert_eq!(creds.expires_at, Some(900));
+        assert_eq!(creds.user_id.as_deref(), Some("stored-user"));
+        assert_eq!(creds.username.as_deref(), Some("stored-name"));
+    }
+
+    #[test]
+    fn an_environment_browser_bundle_takes_precedence_and_drops_stale_oauth_identity() {
+        let mut creds = stored_oauth();
+        creds.auth_token = Some("stored-cookie".into());
+        creds.ct0 = Some("stored-csrf".into());
+        overlay(&mut creds, |key| match key {
+            "X_AUTH_TOKEN" => Some("environment-cookie".into()),
+            "X_CT0" => Some("environment-csrf".into()),
+            "X_ACCESS_TOKEN" => Some("environment-access".into()),
+            "X_REFRESH_TOKEN" => Some("environment-refresh".into()),
+            _ => None,
+        });
+        assert!(creds.uses_web());
+        assert_eq!(creds.auth_token.as_deref(), Some("environment-cookie"));
+        assert!(creds.access_token.is_none());
+        assert!(creds.refresh_token.is_none());
+        assert!(creds.expires_at.is_none());
+        assert!(creds.user_id.is_none());
+        assert!(creds.username.is_none());
+    }
+
+    #[test]
+    fn an_incomplete_environment_browser_bundle_cannot_select_another_stored_session() {
+        for key in ["X_AUTH_TOKEN", "X_CT0"] {
+            let mut creds = stored_oauth();
+            creds.auth_token = Some("stored-cookie".into());
+            creds.ct0 = Some("stored-csrf".into());
+            overlay(&mut creds, |name| {
+                (name == key).then(|| "environment-cookie-part".into())
+            });
+            assert!(!creds.uses_web());
+            assert!(!creds.has_user());
+            assert!(creds.refresh_token.is_none());
+            assert!(creds.user_id.is_none());
+            assert!(creds.username.is_none());
+        }
     }
 
     #[test]

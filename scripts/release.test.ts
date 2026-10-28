@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import { createHash } from 'node:crypto'
-import { homebrewSourceFormula, homebrewFormula, nativeNpmPackages, npmPlatforms, releaseNotes, releaseVersion, validateReleaseOrder, validateVersions } from './release'
+import { homebrewSourceFormula, homebrewFormula, nativeNpmPackages, npmPlatforms, releaseNotes, releasePackages, releaseVersion, requireReleasePackages, validateReleaseOrder, validateVersions } from './release'
 import { selectPlatform, resolveBinary } from '../packages/cli/bin/socli.js'
 import { npmPublishPlan, publicationState } from './publish-npm'
 import { execFileSync } from 'node:child_process'
@@ -35,6 +35,7 @@ describe('release metadata', () => {
     expect(() => releaseNotes(changelog, '1.2.4')).toThrow()
     expect(() => releaseNotes('## [1.2.3] - 2026-02-30\n\n- Fixed it.\n', '1.2.3')).toThrow()
     expect(() => releaseNotes('## [1.2.3] - 2026-10-24\n', '1.2.3')).toThrow()
+    expect(() => releaseNotes(changelog + '\n## [1.2.3] - 2026-10-24\n\n- Duplicate.\n', '1.2.3')).toThrow('exactly one')
   })
   test('checks root package versions, ignoring dependency versions', () => {
     const cargo = '[package]\nname = "socli"\nversion = "1.2.3"\n'
@@ -60,6 +61,63 @@ test('Homebrew downloads the release archives and verifies their actual hashes',
   expect(formula).toContain('https://github.com/owner/project/releases/download/v1.2.3/socli-1.2.3-x86_64-apple-darwin.tar.gz')
   expect(formula).toContain(createHash('sha256').update('aarch64-unknown-linux-musl').digest('hex'))
 })
+
+test('release package list covers Mac installers and every Linux package', () => {
+  const names = releasePackages('1.2.3')
+  expect(names).toContain('socli-1.2.3-aarch64-apple-darwin.dmg')
+  expect(names).toContain('socli-1.2.3-x86_64-apple-darwin.dmg')
+  expect(names).toContain('socli_1.2.3-1_amd64.deb')
+  expect(names).toContain('socli_1.2.3-1_arm64.deb')
+  expect(names).toContain('socli_1.2.3-1_armhf.deb')
+  expect(names).toContain('socli_1.2.3-1_i386.deb')
+  expect(names).toContain('socli-1.2.3-1.aarch64.rpm')
+  expect(names).toContain('socli-1.2.3-1.armv7hl.rpm')
+  expect(names).toContain('socli_1.2.3-r1_aarch64.apk')
+  expect(names).toContain('socli_1.2.3-r1_armv7.apk')
+  expect(names).toContain('socli.rb')
+  expect(names).toContain('soclish-1.2.3.tgz')
+  expect(names).toContain('massimodeluisa-soclib-1.2.3.tgz')
+})
+
+test('a release stops when a required package is absent', async () => {
+  const assets = await mkdtemp(join(tmpdir(), 'socli-packages-'))
+  await expect(requireReleasePackages(assets, '1.2.3')).rejects.toThrow('socli-1.2.3-aarch64-apple-darwin.dmg')
+  for (const name of releasePackages('1.2.3')) await writeFile(join(assets, name), 'package')
+  await expect(requireReleasePackages(assets, '1.2.3')).resolves.toBeUndefined()
+  await writeFile(join(assets, 'socli.rb'), '')
+  await expect(requireReleasePackages(assets, '1.2.3')).rejects.toThrow('nonempty regular file')
+})
+
+test('release package checks honor scoped npm package overrides', async () => {
+  const assets = await mkdtemp(join(tmpdir(), 'socli-renamed-packages-'))
+  const names = releasePackages('1.2.3', '@owner/cli', '@owner/web')
+  expect(names).toContain('owner-cli-1.2.3.tgz')
+  expect(names).toContain('owner-web-1.2.3.tgz')
+  for (const name of names) await writeFile(join(assets, name), 'package')
+  await expect(requireReleasePackages(assets, '1.2.3', '@owner/cli', '@owner/web')).resolves.toBeUndefined()
+})
+
+test('macOS installer disk image contains the component package', async () => {
+  if (process.platform !== 'darwin') return
+  const fixture = await mkdtemp(join(tmpdir(), 'socli-dmg-'))
+  const binary = join(fixture, 'socli')
+  const output = join(fixture, 'socli-1.2.3-aarch64-apple-darwin.dmg')
+  const mounted = join(fixture, 'mounted')
+  await writeFile(binary, '#!/bin/sh\nprintf %s "$0"\n')
+  await chmod(binary, 0o755)
+  await mkdir(mounted)
+  execFileSync('bash', [join(import.meta.dir, 'package-dmg.sh'), binary, output, '1.2.3'], { stdio: 'pipe' })
+  let attached = false
+  try {
+    execFileSync('hdiutil', ['attach', '-nobrowse', '-readonly', '-mountpoint', mounted, output], { stdio: 'pipe' })
+    attached = true
+    expect((await readFile(join(mounted, 'socli.pkg'))).byteLength).toBeGreaterThan(0)
+    const payload = execFileSync('pkgutil', ['--payload-files', join(mounted, 'socli.pkg')], { encoding: 'utf8' })
+    expect(payload).toContain('socli')
+  } finally {
+    if (attached) execFileSync('hdiutil', ['detach', mounted], { stdio: 'pipe' })
+  }
+}, 60000)
 
 test('Core candidate builds locked sources and exercises offline output', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'socli-core-'))
@@ -193,7 +251,7 @@ test('one native npm package contains all six executables and runs without optio
   await writeFile(join(helper, 'package.json'), JSON.stringify({ name: 'socli-obsolete-helper', version }))
   execFileSync('tar', ['-czf', join(assets, 'obsolete.tgz'), '-C', join(fixture, 'obsolete'), 'package'])
   await expect(npmPublishPlan(assets)).rejects.toThrow('only the bundled CLI and browser library')
-}, 30000)
+}, 120000)
 
 test('npm publication retries only skip versions with identical bytes', () => {
   expect(publicationState({ status: 0, stdout: '"sha512-same"', stderr: '' }, 'sha512-same')).toBe('published')

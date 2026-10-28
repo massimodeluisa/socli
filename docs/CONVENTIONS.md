@@ -31,7 +31,7 @@ The page supplies `socli_millis` (`Date.now`), `socli_mono` (`performance.now`),
 
 A new dependency needs its reason stated in the pull request or change description. On macOS, the build also uses `xcrun swiftc` from Xcode Command Line Tools to compile and embed the browser authentication helper in `native/auth-macos.swift`. Other targets omit this helper.
 
-The browser library is published as `@massimodeluisa/soclib`; the native npm launcher is `soclish`. [soclib's README](../packages/web/README.md) documents the mounted and headless reader APIs. Its worker and renderer are shared with the website, and `socli_theme` updates an existing browser session's appearance without recreating that session. Changes to the JavaScript bridge also run `bun test scripts/release.test.ts scripts/soclib.test.ts` and the browser checks served by `scripts/serve-soclib.ts` against the packaged library.
+The browser library is published as `@massimodeluisa/soclib`; the native npm launcher is `soclish`. [soclib's README](../packages/web/README.md) documents the mounted and headless reader APIs. Its worker and renderer are shared with the website, and `socli_theme` updates an existing browser session's appearance without recreating that session. Changes to the JavaScript bridge also run `bun test scripts/release.test.ts scripts/soclib.test.ts scripts/install.test.ts` and the browser checks served by `scripts/serve-soclib.ts` against the packaged library. After building WebAssembly, `bun test scripts/wasm.test.ts` executes the real module without network access; the release web job runs it too. WebAssembly CI rejects compiler warnings.
 
 ## Module map
 
@@ -128,7 +128,7 @@ The process exits with 0 on success, 1 when a network or target failed, and 2 fo
 
 ## Output rules for pipes and agents
 
-Output that is not read by a person at a terminal carries no escape codes: no ANSI color, no OSC 8 hyperlinks, and no Nerd Font glyphs, because the icon choice falls back to Unicode icons when stdout is not a terminal or agent mode is on. `plain.rs` and `hyperlink.rs` check both conditions, and a new output path has to do the same. JSON is written through `say_json` in `main.rs` and uses the field names of `Post::to_json`.
+Output that is not read by a person at a terminal carries no escape codes: no ANSI color, no OSC 8 hyperlinks, and no Nerd Font glyphs, because the icon choice falls back to Unicode icons when stdout is not a terminal or agent mode is on. `plain.rs` and `hyperlink.rs` check both conditions, and a new output path has to do the same. JSON is written through `say_json` in `cli.rs` and uses the field names of `Post::to_json`.
 
 ## Demo mode
 
@@ -139,6 +139,8 @@ Demo mode never touches the network. Every write changes local state only, and t
 A comment that restates the code does not belong in the repository. Keep a comment only when it explains a reason the code cannot show, and use `// MARK:` markers to group the sections of a file. Every module opens with a module doc: one `//!` line, or a `/*! … */` block when it needs more lines. A one-line doc comment on an item uses `///`. A doc comment longer than one line is a single `/** … */` (or `/*! … */`) block, never a stack of `///`, `//!` or `//` lines. Leave no narration and no leftover probes.
 
 ## Tests
+
+The [0.1.3 source review](REVIEW.md) records the failure paths covered by the regression suite and the boundaries that still need live-provider verification.
 
 Unit tests live in a `#[cfg(test)] mod tests` block next to the code they test. The integration tests in `tests/cli.rs` run the built binary through the `socli()` helper, which sets `SOCLI_CONFIG_DIR` to an empty temporary directory, `NO_COLOR=1`, `TERM_PROGRAM=vscode`, `TERM=xterm-256color`, `SSH_TTY=1` and `SOCLI_AGENT=0`, and removes `SOCLI_ICONS`, `NO_ICONS`, `SOCLI_NET`, `SOCLI_THEME`, `SOCLI_DENSITY`, `SOCLI_DETAIL`, `SOCLI_LAYOUT`, `SOCLI_MOUSE`, `SOCLI_IMAGE`, `SOCLI_TRUECOLOR`, `SOCLI_TRACE_FRAMES`, `COLORFGBG` and every network credential variable, so the output is the same on every machine. Tests never touch the network and never read or write `~/.config/socli`. A test that needs to write uses its own directory from `own_config`. Unit tests must not trigger a settings save, because that would write the real config. Renderer tests assert the columns of elbows, stats and folds, and check that no Private Use Area character appears in Unicode mode.
 
@@ -214,7 +216,7 @@ Settings resolve in this order, first match wins:
 | `MASTODON_SERVER` | The Mastodon server for `socli login mastodon` when `--server` is absent, and the server a stored session talks to. Without either, `socli login mastodon` asks for the server, and an empty answer keeps `mastodon.social` |
 | `AI_AGENT` | Names the agent and turns agent mode on; the other variables in `agent.rs` do the same for known agents |
 
-Empty values are ignored. The reader also reads terminal variables to decide what the terminal can draw: `TERM`, `TERM_PROGRAM`, `COLORTERM`, `COLORFGBG` (the light or dark background), `TMUX`, `STY`, `VTE_VERSION`, `WT_SESSION`, `KONSOLE_VERSION`, `SSH_TTY` and `SSH_CONNECTION` (clipboard choice), and `HOME`.
+Empty values are ignored. Credential overrides belong to one session. An explicit X access token selects OAuth and cannot inherit another account's refresh token or browser cookies; a complete explicit cookie pair selects browser authentication. A partial cookie pair cannot reuse a stored session. Changing the Mastodon server drops inherited credentials, and replacing a Mastodon or Threads token clears unrelated account metadata. The reader also reads terminal variables to decide what the terminal can draw: `TERM`, `TERM_PROGRAM`, `COLORTERM`, `COLORFGBG` (the light or dark background), `TMUX`, `STY`, `VTE_VERSION`, `WT_SESSION`, `KONSOLE_VERSION`, `SSH_TTY` and `SSH_CONNECTION` (clipboard choice), and `HOME`.
 
 `socli auth status` redacts every secret: it shows `missing` when a token is not set, `set` for a token of six characters or fewer, and the last four characters for a longer one. Tokens are never printed in full and never logged, and no error text may carry a request URL that holds a token.
 

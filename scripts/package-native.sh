@@ -10,6 +10,10 @@ install -m 755 "target/${TARGET}/release/socli" "release/${archive}/socli"
 cp LICENSE README.md THIRD-PARTY-NOTICES.md CHANGELOG.md "release/${archive}/"
 tar -czf "artifacts/${archive}.tar.gz" -C release "$archive"
 
+if [[ "$TARGET" == *-apple-darwin ]]; then
+  bash scripts/package-dmg.sh "release/${archive}/socli" "artifacts/${archive}.dmg" "$VERSION"
+fi
+
 if [[ "$TARGET" == *linux* ]]; then
   : "${PACKAGE_ARCH:?package architecture is required}"
   : "${PACKAGE_MAINTAINER:?package maintainer is required}"

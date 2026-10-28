@@ -5,7 +5,9 @@ description: How SoCLI draws pictures in the terminal, and how to choose the gra
 
 # Images
 
-Images need a graphics protocol: kitty, iTerm2 or sixel. Without one, SoCLI paints half blocks, and inside tmux it always uses half blocks. Apple Terminal always uses half blocks too, and SoCLI does not send it the kitty probe, because Terminal prints that probe and any kitty or iTerm image as text. The `auto` mode asks every other terminal what it supports and takes the best protocol it finds.
+Use [Ghostty](https://ghostty.org/docs/install/binary) instead of Terminal.app. Install it from the [official installation page](https://ghostty.org/docs/install/binary). Ghostty speaks the kitty graphics protocol, so profile pictures and post images render. Terminal.app does not. SoCLI paints half blocks there, and it does not send Terminal the kitty probe, because Terminal prints that probe and any kitty or iTerm image as text.
+
+Images need a graphics protocol: kitty, iTerm2 or sixel. Without one, SoCLI paints half blocks, and inside tmux it always uses half blocks. The `auto` mode asks every terminal other than Terminal.app what it supports and takes the best protocol it finds.
 
 ## In the reader
 

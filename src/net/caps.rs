@@ -11,7 +11,7 @@ pub const NO_TRENDING: &str =
     "X has no trending feed in SoCLI yet. Try `socli search <words> --net x`";
 
 pub const MASTODON_DEFAULT_SERVER: &str = "mastodon.social";
-const MASTODON_DEFAULT_MAX: usize = 500;
+pub(crate) const MASTODON_DEFAULT_MAX: usize = 500;
 /// Each link counts as 23 characters, whatever its length.
 const MASTODON_URL_LENGTH: usize = 23;
 

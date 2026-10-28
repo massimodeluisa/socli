@@ -27,10 +27,13 @@ const REFRESH_WINDOW: i64 = 7 * DAY;
 pub const DEFAULT_SCOPES: &str = "threads_basic,threads_content_publish,threads_read_replies,threads_manage_replies,threads_manage_mentions,threads_keyword_search,threads_delete";
 
 /// Fixed loopback the terminal listens on. Meta will not accept it as a redirect.
+#[cfg(any(test, not(target_arch = "wasm32")))]
 pub const LOOPBACK_PORT: u16 = 8742;
+#[cfg(any(test, not(target_arch = "wasm32")))]
 pub const LOOPBACK_REDIRECT: &str = "http://127.0.0.1:8742/threads/callback";
 
 /// Callback saved on the Threads app. The site sends a `th.` state on to the loopback.
+#[cfg(any(test, not(target_arch = "wasm32")))]
 pub const PUBLIC_REDIRECT: &str = "https://socli.sh/";
 
 /// The exchange holds the Threads app secret. The client sends the code and the redirect only.
@@ -73,7 +76,9 @@ fn env(key: &str) -> Option<String> {
 pub fn needs_refresh(issued_at: Option<i64>, expires_at: Option<i64>, now: i64) -> bool {
     match (issued_at, expires_at) {
         (Some(issued), Some(expires)) => {
-            now - issued > DAY && expires > now && expires - now <= REFRESH_WINDOW
+            now.saturating_sub(issued) > DAY
+                && expires > now
+                && expires.saturating_sub(now) <= REFRESH_WINDOW
         }
         _ => false,
     }
@@ -167,20 +172,34 @@ pub fn auto_refresh(http: &Client, section: &ThreadsConfig, stored: String) -> S
     }
     match refresh_token(http, &stored) {
         Ok(issued) => {
-            save_refreshed(&issued);
-            issued.access_token
+            if save_refreshed(&issued, &stored).is_ok() {
+                issued.access_token
+            } else {
+                stored
+            }
         }
         Err(_) => stored,
     }
 }
 
-fn save_refreshed(issued: &Issued) {
+fn save_refreshed(issued: &Issued, expected: &str) -> Result<(), String> {
     let at = now();
-    let _ = config::update(|cfg| {
-        cfg.threads.access_token = Some(issued.access_token.clone());
-        cfg.threads.issued_at = Some(at);
-        cfg.threads.expires_at = Some(at + issued.expires_in.unwrap_or(LONG_LIVED));
-    });
+    let expires_at = at
+        .checked_add(issued.expires_in.unwrap_or(LONG_LIVED))
+        .ok_or("Threads returned an invalid token lifetime")?;
+    let mut saved = false;
+    config::update(|cfg| {
+        if cfg.threads.access_token.as_deref() == Some(expected) {
+            cfg.threads.access_token = Some(issued.access_token.clone());
+            cfg.threads.issued_at = Some(at);
+            cfg.threads.expires_at = Some(expires_at);
+            saved = true;
+        }
+    })?;
+    if !saved {
+        return Err("the Threads sign-in changed while refreshing. run the command again".into());
+    }
+    Ok(())
 }
 
 fn date(epoch: i64) -> String {
@@ -201,7 +220,13 @@ fn finish(http: Client, issued: Issued) -> Result<(), String> {
     };
     let user_id = split(&user.id).map(|(_, native)| native.to_string());
     let at = now();
-    let expires_at = issued.expires_in.map(|secs| at + secs);
+    let expires_at = issued
+        .expires_in
+        .map(|secs| {
+            at.checked_add(secs)
+                .ok_or("Threads returned an invalid token lifetime")
+        })
+        .transpose()?;
     config::update(|cfg| {
         cfg.threads.user_id = user_id;
         cfg.threads.username = Some(user.username.clone());
@@ -499,8 +524,8 @@ pub fn refresh() -> Result<(), String> {
     let issued = refresh_token(&http, &token).map_err(|e| {
         format!("{e}. tokens refresh once they are a day old and before they expire, otherwise run `socli login threads`")
     })?;
-    save_refreshed(&issued);
-    let until = date(now() + issued.expires_in.unwrap_or(LONG_LIVED));
+    save_refreshed(&issued, &token)?;
+    let until = date(now().saturating_add(issued.expires_in.unwrap_or(LONG_LIVED)));
     util::say(format!("Refreshed the Threads token, valid until {until}"))
 }
 
@@ -514,6 +539,43 @@ mod tests {
     use crate::net::scoped;
 
     const NOW: i64 = 10_000_000;
+
+    #[test]
+    fn refresh_timestamps_cannot_overflow() {
+        assert!(!needs_refresh(Some(i64::MIN), Some(i64::MAX), NOW));
+        assert!(!needs_refresh(Some(i64::MAX), Some(i64::MAX), i64::MIN));
+    }
+
+    #[test]
+    fn refreshing_cannot_overwrite_a_newer_token_or_restore_sign_out() {
+        with_config(|| {
+            config::update(|cfg| cfg.threads.access_token = Some("old".into())).unwrap();
+            let issued = Issued {
+                access_token: "new".into(),
+                expires_in: Some(LONG_LIVED),
+            };
+            save_refreshed(&issued, "old").unwrap();
+            assert_eq!(
+                config::load().unwrap().threads.access_token.as_deref(),
+                Some("new")
+            );
+            assert!(save_refreshed(
+                &Issued {
+                    access_token: "stale".into(),
+                    expires_in: Some(LONG_LIVED)
+                },
+                "old"
+            )
+            .is_err());
+            assert_eq!(
+                config::load().unwrap().threads.access_token.as_deref(),
+                Some("new")
+            );
+            config::update(|cfg| cfg.threads = ThreadsConfig::default()).unwrap();
+            assert!(save_refreshed(&issued, "old").is_err());
+            assert!(config::load().unwrap().threads.access_token.is_none());
+        });
+    }
 
     fn with_config(body: impl FnOnce() + std::panic::UnwindSafe) {
         let _guard = crate::config::lock_config_env();

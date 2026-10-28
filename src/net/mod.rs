@@ -96,6 +96,15 @@ impl Network {
         }
     }
 
+    /// Live pause. The wording is the product message, capitals included.
+    /// `--demo` ignores it. Removing the string turns the network back on.
+    pub fn hold(self) -> Option<&'static str> {
+        match self {
+            Network::Threads => Some("Waiting for Meta approval"),
+            _ => None,
+        }
+    }
+
     /// What a signed-in account can do here: the signed-in column of the capability table.
     pub fn caps(self) -> Caps {
         match self {
@@ -315,11 +324,17 @@ pub enum NetError {
     },
     #[error("could not read the {} response: {message}", .net.title())]
     Parse { net: Network, message: String },
+    #[error("{message}; the request may have reached {}; check before retrying", .net.title())]
+    OutcomeUnknown { net: Network, message: String },
     #[error("{0}")]
     Other(String),
 }
 
 impl NetError {
+    pub fn outcome_unknown(&self) -> bool {
+        matches!(self, Self::OutcomeUnknown { .. })
+    }
+
     pub fn unsupported(net: Network, what: impl Into<String>) -> Self {
         NetError::Unsupported {
             net,
@@ -411,7 +426,13 @@ impl Clients {
             x,
             bluesky: bluesky::BlueskyClient::new(&config.bluesky),
             devnull: devnull::DevnullClient::new(&config.devnull),
-            threads: threads::ThreadsClient::from_config(&config.threads),
+            // The token stays in the file. A live session does not build the client while Threads is on hold,
+            // so a stored token cannot refresh or post. `socli logout threads` still clears the section.
+            threads: if Network::Threads.hold().is_some() {
+                None
+            } else {
+                threads::ThreadsClient::from_config(&config.threads)
+            },
             mastodon: mastodon::MastodonClient::new(&config.mastodon),
             #[cfg(test)]
             stub: None,
@@ -744,6 +765,9 @@ mod tests {
             vec![Network::X, Network::Bluesky]
         );
         assert_eq!(parse_list("all").unwrap(), Network::ALL.to_vec());
+        assert_eq!(parse_list("threads").unwrap(), vec![Network::Threads]);
+        assert_eq!(Network::Threads.hold(), Some("Waiting for Meta approval"));
+        assert_eq!(Network::X.hold(), None);
         assert!(parse_list("reddit").is_err());
     }
 

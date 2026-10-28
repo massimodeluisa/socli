@@ -147,6 +147,7 @@ const READER_FILES = new Set([
   "/docs.html",
   "/docs.md",
   "/404.html",
+  "/install.sh",
 ])
 
 /** True when this path is a file from the built site, including the homepage and the reader. */

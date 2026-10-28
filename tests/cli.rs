@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
 const CREDENTIALS: &[&str] = &[
+    "X_AUTH_TOKEN",
+    "X_CT0",
     "X_CLIENT_ID",
     "X_CLIENT_SECRET",
     "X_ACCESS_TOKEN",
@@ -16,6 +18,8 @@ const CREDENTIALS: &[&str] = &[
     "THREADS_ACCESS_TOKEN",
     "THREADS_APP_ID",
     "THREADS_APP_SECRET",
+    "MASTODON_ACCESS_TOKEN",
+    "MASTODON_SERVER",
 ];
 
 /// An empty config directory for this test process; no test writes to it.
@@ -88,6 +92,27 @@ fn demo_print(width: &str, extra: &[&str]) -> String {
 
 fn private_use(c: char) -> bool {
     matches!(c as u32, 0xE000..=0xF8FF | 0xF0000..=0xFFFFD)
+}
+
+#[test]
+fn configuration_errors_stay_failures_and_do_not_print_secrets() {
+    let dir = own_config("Broken pipe");
+    std::fs::write(
+        dir.join("config.toml"),
+        "[x]\naccess_token = [\"private-token\"]\n",
+    )
+    .unwrap();
+    let out = socli()
+        .env("SOCLI_CONFIG_DIR", &dir)
+        .args(["config", "list", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    let error: serde_json::Value = serde_json::from_slice(&out.stderr).unwrap();
+    assert!(error["error"].as_str().unwrap().contains("not valid toml"));
+    assert!(!String::from_utf8_lossy(&out.stderr).contains("private-token"));
+    std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[test]
@@ -488,12 +513,16 @@ fn no_account_says_how_to_sign_in() {
 #[test]
 fn auth_status_lists_every_network() {
     let text = stdout_of(socli().args(["auth", "status"]).output().unwrap());
-    for net in ["x", "bluesky", "dev/null", "threads"] {
+    for net in ["x", "bluesky", "dev/null"] {
         assert!(
             text.contains(&format!("\n{net}\n  account        not signed in\n")),
             "{net}: {text}"
         );
     }
+    assert!(
+        text.contains("\nthreads\n  account        Waiting for Meta approval\n"),
+        "{text}"
+    );
     assert!(text.contains("default network  not set"), "{text}");
 }
 
@@ -761,6 +790,20 @@ fn account_config_and_drafts_commands_print_json() {
             "updated_at": "2026-10-20T11:05:00+00:00"
         }])
     );
+    let mut pending: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("drafts.json")).unwrap()).unwrap();
+    pending[0]["sending"] = serde_json::json!(["bluesky"]);
+    std::fs::write(
+        dir.join("drafts.json"),
+        serde_json::to_string(&pending).unwrap(),
+    )
+    .unwrap();
+    let pending = json(&["drafts"]);
+    assert_eq!(pending[0]["sending"], serde_json::json!(["bluesky"]));
+    assert!(pending[0]["warning"]
+        .as_str()
+        .unwrap()
+        .contains("check before posting again"));
     assert_eq!(
         json(&["drafts", "rm", "1"]),
         serde_json::json!({ "ok": true, "removed": 1, "id": "2" })
@@ -1368,20 +1411,6 @@ fn agents_cannot_open_a_browser_sign_in() {
             &["auth", "devnull", "login"],
             "signing in to dev/null needs a person at a browser. Run socli login devnull in a terminal",
         ),
-        (
-            &[
-                "auth",
-                "threads",
-                "oauth",
-                "--app-id",
-                "1",
-                "--app-secret",
-                "s",
-                "--redirect-uri",
-                "https://localhost/cb",
-            ],
-            "signing in to Threads needs a person at a browser. Run socli auth threads oauth in a terminal",
-        ),
     ] {
         let out = socli().env("SOCLI_AGENT", "1").args(args).output().unwrap();
         assert_eq!(out.status.code(), Some(2), "{args:?}");
@@ -1390,6 +1419,54 @@ fn agents_cannot_open_a_browser_sign_in() {
             format!("{}\n", serde_json::json!({ "error": message }))
         );
     }
+}
+
+#[test]
+fn threads_waits_for_meta_approval() {
+    let message = "Waiting for Meta approval";
+    for args in [
+        &["login", "threads"][..],
+        &["auth", "threads", "login"],
+        &["auth", "threads", "refresh"],
+        &[
+            "auth",
+            "threads",
+            "oauth",
+            "--app-id",
+            "1",
+            "--app-secret",
+            "s",
+            "--redirect-uri",
+            "https://localhost/cb",
+        ],
+        &["whoami", "--net", "threads"],
+        &["post", "hi", "--net", "x,threads"],
+    ] {
+        let out = socli().args(args).output().unwrap();
+        assert_eq!(out.status.code(), Some(1), "{args:?}");
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(err.contains(message), "{args:?}: {err}");
+        assert!(!err.contains("http"), "{args:?}: {err}");
+    }
+    let out = socli()
+        .env("SOCLI_AGENT", "1")
+        .args(["login", "threads"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8(out.stderr).unwrap(),
+        format!("{}\n", serde_json::json!({ "error": message }))
+    );
+    let out = socli()
+        .args(["--demo", "whoami", "--net", "threads"])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[test]

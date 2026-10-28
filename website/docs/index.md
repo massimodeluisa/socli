@@ -21,7 +21,13 @@ To use the bare `socli` commands in the examples below, install the command glob
 npm install --global soclish
 ```
 
-The [Install](install.html) page covers Homebrew availability, source builds, shell completions and icons.
+On Linux, one command reads the distribution, installs the matching release package, and prints how to start it:
+
+```sh
+curl -fsSL https://socli.sh/install.sh | sh
+```
+
+The [Install](install.html) page covers Homebrew, the macOS installer, Linux packages, source builds, shell completions and icons. Run SoCLI in [Ghostty](https://ghostty.org/docs/install/binary) instead of Terminal.app so images render. Install Ghostty from its [official installation page](https://ghostty.org/docs/install/binary).
 
 ## Open the demo
 

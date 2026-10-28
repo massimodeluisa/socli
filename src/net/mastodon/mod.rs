@@ -53,7 +53,7 @@ fn next_cursor(link: Option<&str>) -> Option<String> {
     Url::parse(target)
         .ok()?
         .query_pairs()
-        .find(|(key, _)| key == "max_id" || key == "offset")
+        .find(|(key, value)| (key == "max_id" || key == "offset") && is_digits(value))
         .map(|(key, value)| format!("{key}={value}"))
 }
 
@@ -61,11 +61,56 @@ fn next_cursor(link: Option<&str>) -> Option<String> {
 fn cursor_pair(cursor: Option<&str>) -> Option<(&'static str, String)> {
     let cursor = cursor?;
     match cursor.split_once('=') {
-        Some(("max_id", value)) => Some(("max_id", value.to_string())),
-        Some(("offset", value)) => Some(("offset", value.to_string())),
+        Some(("max_id", value)) if is_digits(value) => Some(("max_id", value.to_string())),
+        Some(("offset", value)) if is_digits(value) => Some(("offset", value.to_string())),
         Some(_) => None,
         None if is_digits(cursor) => Some(("max_id", cursor.to_string())),
         None => None,
+    }
+}
+
+fn page_cursor(cursor: Option<&str>) -> Result<Option<(&'static str, String)>, NetError> {
+    cursor
+        .map(|value| {
+            cursor_pair(Some(value)).ok_or_else(|| {
+                NetError::Other(
+                    "invalid Mastodon page cursor. refresh the feed and try again".into(),
+                )
+            })
+        })
+        .transpose()
+}
+
+fn search_offset(cursor: Option<&str>, count: u8) -> Result<usize, NetError> {
+    let offset = match page_cursor(cursor)? {
+        Some(("offset", value)) => value.parse::<usize>().ok(),
+        None => Some(0),
+        _ => None,
+    };
+    offset
+        .filter(|offset| {
+            offset
+                .checked_add(usize::from(count.clamp(1, 40)))
+                .is_some()
+        })
+        .ok_or_else(|| {
+            NetError::Other("invalid Mastodon search cursor. run the search again".into())
+        })
+}
+
+fn tag_path(word: &str) -> String {
+    let encoded: String = url::form_urlencoded::byte_serialize(word.as_bytes()).collect();
+    format!("/api/v1/timelines/tag/{encoded}")
+}
+
+fn confirm_action(value: &Value, field: &str, on: bool) -> Result<(), NetError> {
+    if value.get(field).and_then(Value::as_bool) == Some(on) {
+        Ok(())
+    } else {
+        Err(NetError::OutcomeUnknown {
+            net: Network::Mastodon,
+            message: "Mastodon did not confirm the requested change".into(),
+        })
     }
 }
 
@@ -105,6 +150,33 @@ fn clean(value: Option<String>) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+fn resolved_section(
+    section: &MastodonConfig,
+    env: impl Fn(&str) -> Option<String>,
+) -> MastodonConfig {
+    let stored_server = clean(section.server.clone()).unwrap_or_else(|| DEFAULT_SERVER.into());
+    let selected_server = clean(env("MASTODON_SERVER")).unwrap_or_else(|| stored_server.clone());
+    let server = auth::normalize_server(&selected_server).unwrap_or(selected_server);
+    let same_server = auth::normalize_server(&stored_server).as_deref() == Ok(server.as_str());
+    let stored_token = clean(section.access_token.clone());
+    let token = clean(env("MASTODON_ACCESS_TOKEN"))
+        .or_else(|| same_server.then(|| stored_token.clone()).flatten());
+    if same_server && token == stored_token {
+        MastodonConfig {
+            server: Some(server),
+            access_token: token,
+            ..section.clone()
+        }
+    } else {
+        MastodonConfig {
+            server: Some(server),
+            access_token: token,
+            max_chars: same_server.then_some(section.max_chars).flatten(),
+            ..MastodonConfig::default()
+        }
+    }
+}
+
 fn native(id: &str) -> Result<&str, NetError> {
     match split(id) {
         Some((Network::Mastodon, native)) => Ok(native),
@@ -126,17 +198,18 @@ impl MastodonClient {
     }
 
     fn from_section(section: &MastodonConfig, env: impl Fn(&str) -> Option<String>) -> Self {
-        if let Some(max) = section.max_chars.filter(|n| *n > 0) {
-            super::caps::set_mastodon_limit(max);
-        }
+        let section = resolved_section(section, env);
+        super::caps::set_mastodon_limit(
+            section
+                .max_chars
+                .filter(|n| *n > 0)
+                .unwrap_or(super::caps::MASTODON_DEFAULT_MAX),
+        );
         MastodonClient {
-            server: clean(env("MASTODON_SERVER"))
-                .or_else(|| clean(section.server.clone()))
-                .unwrap_or_else(|| DEFAULT_SERVER.to_string()),
-            token: clean(env("MASTODON_ACCESS_TOKEN"))
-                .or_else(|| clean(section.access_token.clone())),
-            user_id: section.user_id.clone(),
-            username: section.username.clone(),
+            server: section.server.unwrap_or_else(|| DEFAULT_SERVER.into()),
+            token: section.access_token,
+            user_id: section.user_id,
+            username: section.username,
             http: None,
         }
     }
@@ -183,6 +256,7 @@ impl MastodonClient {
         let client = self.http()?;
         let url = format!("{}{path}", self.base());
         let creates = method == Method::POST && path == "/api/v1/statuses";
+        let mutation = method != Method::GET;
         let mut request = client.request(method, &url).query(query);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
@@ -193,13 +267,9 @@ impl MastodonClient {
         if creates {
             request = request.header("Idempotency-Key", code_verifier());
         }
-        let response = request.send().map_err(|e| {
-            NetError::Other(format!(
-                "could not reach {} ({}). check your connection and try again",
-                self.server,
-                e.without_url()
-            ))
-        })?;
+        let response = request
+            .send()
+            .map_err(|error| http::transport_error(Network::Mastodon, error, mutation))?;
         let status = response.status().as_u16();
         let header = |name: &str| {
             response
@@ -213,16 +283,32 @@ impl MastodonClient {
             header("x-ratelimit-reset"),
             header("retry-after"),
         );
-        let body = response
-            .text()
-            .map_err(|e| NetError::Other(format!("could not read the Mastodon response: {e}")))?;
+        let body = http::read_text(response).map_err(|message| {
+            if mutation && (200..300).contains(&status) {
+                NetError::OutcomeUnknown {
+                    net: Network::Mastodon,
+                    message,
+                }
+            } else {
+                NetError::Other(format!("could not read the Mastodon response: {message}"))
+            }
+        })?;
         if (200..300).contains(&status) {
             let value = if body.trim().is_empty() {
                 Value::Null
             } else {
-                serde_json::from_str(&body).map_err(|e| NetError::Parse {
-                    net: Network::Mastodon,
-                    message: e.to_string(),
+                serde_json::from_str(&body).map_err(|error| {
+                    if mutation {
+                        NetError::OutcomeUnknown {
+                            net: Network::Mastodon,
+                            message: format!("could not read the Mastodon response: {error}"),
+                        }
+                    } else {
+                        NetError::Parse {
+                            net: Network::Mastodon,
+                            message: error.to_string(),
+                        }
+                    }
                 })?
             };
             return Ok(Answer {
@@ -245,6 +331,13 @@ impl MastodonClient {
                     "{} no longer accepts the saved token. run `socli login mastodon` again",
                     self.server
                 ),
+            });
+        }
+        if mutation && status >= 500 {
+            return Err(NetError::OutcomeUnknown {
+                net: Network::Mastodon,
+                message: http::error_text(&body)
+                    .unwrap_or_else(|| format!("Mastodon returned {status}")),
             });
         }
         Err(NetError::Http {
@@ -272,7 +365,7 @@ impl MastodonClient {
         count: u8,
     ) -> Result<(Vec<Value>, Option<String>), NetError> {
         query.push(("limit", limit(count)));
-        if let Some((key, value)) = cursor_pair(cursor) {
+        if let Some((key, value)) = page_cursor(cursor)? {
             query.push((key, value));
         }
         let answer = self.get(path, &query)?;
@@ -355,8 +448,17 @@ impl MastodonClient {
     fn act(&mut self, id: &str, verb: &str) -> Result<(), NetError> {
         self.session()?;
         let local = self.status_id(id)?;
-        self.post_to(&format!("/api/v1/statuses/{local}/{verb}"), Body::None)
-            .map(|_| ())
+        let answer = self.post_to(&format!("/api/v1/statuses/{local}/{verb}"), Body::None)?;
+        let (field, on) = match verb {
+            "favourite" => ("favourited", true),
+            "unfavourite" => ("favourited", false),
+            "reblog" => ("reblogged", true),
+            "unreblog" => ("reblogged", false),
+            "bookmark" => ("bookmarked", true),
+            "unbookmark" => ("bookmarked", false),
+            _ => return Err(NetError::Other("unknown Mastodon action".into())),
+        };
+        confirm_action(&answer.value, field, on)
     }
 }
 
@@ -391,8 +493,11 @@ impl Provider for MastodonClient {
     fn me(&mut self) -> Result<User, NetError> {
         self.session()?;
         let answer = self.get("/api/v1/accounts/verify_credentials", &[])?;
-        map::user(&answer.value, &self.server)
-            .ok_or_else(|| NetError::Other("Mastodon returned an empty profile".into()))
+        let user = map::user(&answer.value, &self.server)
+            .ok_or_else(|| NetError::Other("Mastodon returned an empty profile".into()))?;
+        self.user_id = split(&user.id).map(|(_, id)| id.to_string());
+        self.username = Some(user.username.clone());
+        Ok(user)
     }
 
     fn feed(&mut self, kind: FeedKind, cursor: Option<&str>, count: u8) -> Result<Page, NetError> {
@@ -472,23 +577,15 @@ impl Provider for MastodonClient {
     fn search(&mut self, query: &str, cursor: Option<&str>, count: u8) -> Result<Page, NetError> {
         self.session()?;
         let query = query.trim();
-        let tag = query
-            .strip_prefix('#')
-            .filter(|word| !word.is_empty() && !word.contains(char::is_whitespace));
+        let tag = query.strip_prefix('#').filter(|word| {
+            !word.is_empty() && word.chars().all(|c| c.is_alphanumeric() || c == '_')
+        });
         if let Some(word) = tag {
-            let (items, next) = self.list(
-                &format!("/api/v1/timelines/tag/{word}"),
-                Vec::new(),
-                cursor,
-                count,
-            )?;
+            let (items, next) = self.list(&tag_path(word), Vec::new(), cursor, count)?;
             return Ok(map::statuses_page(&items, next, &self.server));
         }
         let asked = limit(count);
-        let offset = match cursor_pair(cursor) {
-            Some(("offset", value)) => value.parse::<usize>().unwrap_or(0),
-            _ => 0,
-        };
+        let offset = search_offset(cursor, count)?;
         let params = [
             ("q", query.to_string()),
             ("type", "statuses".to_string()),
@@ -502,21 +599,35 @@ impl Provider for MastodonClient {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        let next = (asked.parse::<usize>() == Ok(items.len()))
-            .then(|| format!("offset={}", offset + items.len()));
+        let next = if asked.parse::<usize>() == Ok(items.len()) {
+            offset
+                .checked_add(items.len())
+                .map(|next| format!("offset={next}"))
+        } else {
+            None
+        };
         Ok(map::statuses_page(&items, next, &self.server))
     }
 
     fn post(&mut self, draft: &Draft) -> Result<Post, NetError> {
-        self.account()
-            .ok_or(NetError::SignInRequired(Network::Mastodon))?;
+        self.session()?;
+        if self.account().is_none() {
+            self.me()?;
+        }
         let mut text = draft.text.clone();
         let mut body = json!({});
         if let Some(reply_to) = draft.reply_to.as_deref() {
             let parent = self.status(reply_to)?;
-            if let Some(parent_id) = parent.get("id") {
-                body["in_reply_to_id"] = parent_id.clone();
-            }
+            let parent_id = parent
+                .get("id")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| {
+                    NetError::Other(
+                        "Mastodon returned a parent without an id. the reply was not sent".into(),
+                    )
+                })?;
+            body["in_reply_to_id"] = json!(parent_id);
             let visibility = parent.get("visibility").and_then(Value::as_str);
             if let Some(visibility) =
                 visibility.filter(|v| ["unlisted", "private", "direct"].contains(v))
@@ -567,8 +678,10 @@ impl Provider for MastodonClient {
         }
         body["status"] = json!(text);
         let answer = self.post_to("/api/v1/statuses", Body::Json(&body))?;
-        map::post(&answer.value, &self.server)
-            .ok_or_else(|| NetError::Other("Mastodon did not return the new post".into()))
+        map::post(&answer.value, &self.server).ok_or_else(|| NetError::OutcomeUnknown {
+            net: Network::Mastodon,
+            message: "Mastodon did not return the new post".into(),
+        })
     }
 
     fn delete(&mut self, id: &str) -> Result<(), NetError> {
@@ -610,12 +723,13 @@ impl Provider for MastodonClient {
 
 /// The `mastodon` rows of `socli auth status`, secrets redacted.
 pub fn status(section: &MastodonConfig) -> Vec<(&'static str, String)> {
-    let env = |key: &str| clean(std::env::var(key).ok());
-    let token = env("MASTODON_ACCESS_TOKEN").or_else(|| clean(section.access_token.clone()));
-    let server = env("MASTODON_SERVER")
-        .or_else(|| clean(section.server.clone()))
-        .unwrap_or_else(|| DEFAULT_SERVER.to_string());
-    let account = match (&token, &section.username) {
+    let section = resolved_section(section, |key| std::env::var(key).ok());
+    let token = section.access_token.as_deref();
+    let server = section
+        .server
+        .clone()
+        .unwrap_or_else(|| DEFAULT_SERVER.into());
+    let account = match (token, &section.username) {
         (Some(_), Some(user)) => format!("@{user}"),
         (Some(_), None) => "signed in".into(),
         (None, _) => "not signed in".into(),
@@ -627,7 +741,7 @@ pub fn status(section: &MastodonConfig) -> Vec<(&'static str, String)> {
     };
     vec![
         ("account", account),
-        ("token", config::redact(token.as_deref())),
+        ("token", config::redact(token)),
         ("server", server),
         ("app", app.into()),
     ]
@@ -636,6 +750,117 @@ pub fn status(section: &MastodonConfig) -> Vec<(&'static str, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn changing_servers_never_reuses_the_saved_token_or_identity() {
+        let section = MastodonConfig {
+            server: Some("a.example".into()),
+            access_token: Some("token-a".into()),
+            user_id: Some("account-a".into()),
+            username: Some("ada@a.example".into()),
+            client_id: Some("client-a".into()),
+            client_secret: Some("secret-a".into()),
+            max_chars: Some(1000),
+            ..MastodonConfig::default()
+        };
+        let changed = resolved_section(&section, |key| {
+            (key == "MASTODON_SERVER").then(|| "b.example".into())
+        });
+        assert_eq!(changed.server.as_deref(), Some("b.example"));
+        assert!(changed.access_token.is_none());
+        assert!(changed.user_id.is_none() && changed.username.is_none());
+        assert!(changed.client_id.is_none() && changed.client_secret.is_none());
+        assert!(changed.max_chars.is_none());
+        let client = MastodonClient::from_section(&section, |key| {
+            (key == "MASTODON_SERVER").then(|| "b.example".into())
+        });
+        assert!(!client.signed_in());
+        assert!(client.account().is_none());
+        assert_eq!(client.base(), "https://b.example");
+        assert_eq!(section.access_token.as_deref(), Some("token-a"));
+    }
+
+    #[test]
+    fn an_environment_token_keeps_metadata_only_for_the_same_account_and_server() {
+        let section = MastodonConfig {
+            server: Some("a.example".into()),
+            access_token: Some("token-a".into()),
+            user_id: Some("account-a".into()),
+            username: Some("ada@a.example".into()),
+            ..MastodonConfig::default()
+        };
+        let changed = MastodonClient::from_section(&section, |key| match key {
+            "MASTODON_ACCESS_TOKEN" => Some("token-b".into()),
+            _ => None,
+        });
+        assert_eq!(changed.token.as_deref(), Some("token-b"));
+        assert!(changed.signed_in());
+        assert!(changed.account().is_none());
+        assert!(changed.user_id.is_none());
+        let same = MastodonClient::from_section(&section, |key| match key {
+            "MASTODON_ACCESS_TOKEN" => Some(" token-a ".into()),
+            "MASTODON_SERVER" => Some("https://A.EXAMPLE/about".into()),
+            _ => None,
+        });
+        assert_eq!(same.user_id.as_deref(), Some("account-a"));
+        assert_eq!(same.account().unwrap().username, "ada@a.example");
+        let changed_both = resolved_section(&section, |key| match key {
+            "MASTODON_ACCESS_TOKEN" => Some("token-b".into()),
+            "MASTODON_SERVER" => Some("b.example".into()),
+            _ => None,
+        });
+        assert_eq!(changed_both.access_token.as_deref(), Some("token-b"));
+        assert!(changed_both.username.is_none());
+    }
+
+    #[test]
+    fn toggles_require_confirmation_of_the_requested_state() {
+        for field in ["favourited", "reblogged", "bookmarked"] {
+            assert!(confirm_action(&json!({ field: true }), field, true).is_ok());
+            assert!(confirm_action(&json!({ field: false }), field, false).is_ok());
+            assert!(matches!(
+                confirm_action(&json!({ field: false }), field, true),
+                Err(NetError::OutcomeUnknown { .. })
+            ));
+            assert!(matches!(
+                confirm_action(&json!({}), field, false),
+                Err(NetError::OutcomeUnknown { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn malformed_or_overflowing_cursors_fail_before_a_request() {
+        for cursor in [
+            "",
+            "offset=",
+            "offset=-1",
+            "offset=no",
+            "max_id=1&local=true",
+            "since_id=1",
+        ] {
+            assert!(page_cursor(Some(cursor)).is_err());
+        }
+        let overflow = format!("offset={}", usize::MAX);
+        assert!(search_offset(Some(&overflow), 10).is_err());
+        let too_large = format!("offset={}0", usize::MAX);
+        assert!(search_offset(Some(&too_large), 10).is_err());
+        assert_eq!(search_offset(Some("offset=40"), 20).unwrap(), 40);
+        assert_eq!(search_offset(None, 20).unwrap(), 0);
+        assert!(search_offset(Some("max_id=1"), 20).is_err());
+    }
+
+    #[test]
+    fn hashtag_text_cannot_change_the_request_path_or_query() {
+        let path = tag_path("rust/other?local=true#fragment");
+        let url = Url::parse(&format!("https://mastodon.social{path}")).unwrap();
+        assert_eq!(
+            url.path(),
+            "/api/v1/timelines/tag/rust%2Fother%3Flocal%3Dtrue%23fragment"
+        );
+        assert!(url.query().is_none());
+        assert!(url.fragment().is_none());
+    }
 
     #[test]
     fn length_counts_links_as_23_and_mentions_without_their_server() {

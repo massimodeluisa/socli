@@ -276,7 +276,7 @@ impl State {
         };
         let available: Vec<Network> = nets
             .iter()
-            .filter(|info| info.signed_in)
+            .filter(|info| info.signed_in && (demo || info.net.hold().is_none()))
             .map(|info| info.net)
             .collect();
         let configured = config
@@ -489,11 +489,20 @@ impl State {
         }
     }
 
+    /// The live pause for `net`. Demo mode never pauses a network.
+    pub fn held(&self, net: Network) -> Option<&'static str> {
+        if self.demo {
+            None
+        } else {
+            net.hold()
+        }
+    }
+
     /// Signed-in networks, in network order; the ones a chip can turn on.
     pub fn available(&self) -> Vec<Network> {
         self.nets
             .iter()
-            .filter(|info| info.signed_in)
+            .filter(|info| info.signed_in && self.held(info.net).is_none())
             .map(|info| info.net)
             .collect()
     }
@@ -508,6 +517,7 @@ impl State {
         let available = self.available();
         Network::ALL
             .into_iter()
+            .filter(|net| self.held(*net).is_none())
             .map(|net| (net, self.on.contains(&net), available.contains(&net)))
             .collect()
     }
@@ -558,6 +568,9 @@ impl State {
 
     /// Replaces the on-set. Merged feeds a live client fetched for the old set load again.
     pub fn set_on(&mut self, mut on: Vec<Network>) {
+        if !self.demo {
+            on.retain(|net| net.hold().is_none());
+        }
         on.sort();
         on.dedup();
         if on != self.on && !self.demo {
@@ -678,7 +691,7 @@ impl State {
     pub fn post_targets(&self) -> Vec<Network> {
         self.nets
             .iter()
-            .filter(|info| info.signed_in && info.caps.post)
+            .filter(|info| info.signed_in && info.caps.post && self.held(info.net).is_none())
             .map(|info| info.net)
             .collect()
     }
@@ -700,7 +713,7 @@ impl State {
         let signed: Vec<Network> = self
             .nets
             .iter()
-            .filter(|info| info.signed_in)
+            .filter(|info| info.signed_in && self.held(info.net).is_none())
             .map(|info| info.net)
             .collect();
         if let [only] = signed.as_slice() {
@@ -712,6 +725,9 @@ impl State {
 
     /// Unsupported when the network itself lacks the action, sign-in required when only this client does.
     fn check(&self, net: Network, what: &str, has: impl Fn(&Caps) -> bool) -> Result<(), String> {
+        if let Some(message) = self.held(net) {
+            return Err(message.into());
+        }
         if !has(&net.caps()) {
             return Err(NetError::unsupported(net, what).into());
         }
@@ -1514,10 +1530,16 @@ impl State {
                 let available = self.available();
                 let on = match scope {
                     Scope::All => available,
-                    Scope::One(net) if available.contains(&net) => vec![net],
                     Scope::One(net) => {
-                        self.fail(NetError::SignInRequired(net).to_string());
-                        return Ok(Outcome::None);
+                        if let Some(message) = self.held(net) {
+                            self.fail(message);
+                            return Ok(Outcome::None);
+                        }
+                        if !available.contains(&net) {
+                            self.fail(NetError::SignInRequired(net).to_string());
+                            return Ok(Outcome::None);
+                        }
+                        vec![net]
                     }
                 };
                 self.switch_on(on, clients)?;
@@ -2317,7 +2339,11 @@ impl State {
                 let kinds: HashMap<Network, FeedKind> = self
                     .nets
                     .iter()
-                    .filter(|info| info.signed_in && self.on.contains(&info.net))
+                    .filter(|info| {
+                        info.signed_in
+                            && self.held(info.net).is_none()
+                            && self.on.contains(&info.net)
+                    })
                     .filter_map(|info| {
                         let kind = match &id {
                             FeedId::Kind(kind) => info.caps.resolve_feed(info.net, *kind),
@@ -2365,7 +2391,10 @@ impl State {
                         .nets
                         .iter()
                         .filter(|info| {
-                            info.signed_in && info.caps.mentions && self.on.contains(&info.net)
+                            info.signed_in
+                                && self.held(info.net).is_none()
+                                && info.caps.mentions
+                                && self.on.contains(&info.net)
                         })
                         .map(|info| info.net)
                         .collect(),
@@ -2389,7 +2418,10 @@ impl State {
                         .nets
                         .iter()
                         .filter(|info| {
-                            info.signed_in && info.caps.search && self.on.contains(&info.net)
+                            info.signed_in
+                                && self.held(info.net).is_none()
+                                && info.caps.search
+                                && self.on.contains(&info.net)
                         })
                         .map(|info| info.net)
                         .collect(),
@@ -2506,14 +2538,22 @@ impl State {
         append: bool,
     ) -> Result<(), String> {
         let several = results.len() > 1;
+        let merged = id.merged();
         let single = results.first().map(|(net, _)| *net);
+        let mut failed = HashSet::new();
         let mut errors = Vec::new();
         let mut pages = Vec::new();
         for (net, result) in results {
             match result {
                 Ok(page) => pages.push((net, page)),
-                Err(err) if several => errors.push(format!("{}: {err}", net.label())),
-                Err(err) => errors.push(err.to_string()),
+                Err(err) => {
+                    failed.insert(net);
+                    errors.push(if several {
+                        format!("{}: {err}", net.label())
+                    } else {
+                        err.to_string()
+                    });
+                }
             }
         }
         if pages.is_empty() {
@@ -2527,8 +2567,12 @@ impl State {
         }
         let feed = self.feeds.entry(id).or_default();
         if !append {
-            feed.ids.clear();
-            feed.next.clear();
+            feed.ids.retain(|id| {
+                self.posts
+                    .get(id)
+                    .is_some_and(|post| failed.contains(&post.net))
+            });
+            feed.next.retain(|net, _| failed.contains(net));
         }
         let mut n = 0;
         let mut fresh = Vec::new();
@@ -2545,11 +2589,19 @@ impl State {
                 }
             }
             match page.next {
+                Some(next) if next.trim().is_empty() => feed.next.remove(&net),
+                Some(next) if append && feed.next.get(&net) == Some(&next) => {
+                    errors.push(format!(
+                        "{} pagination did not advance; stopped loading more",
+                        net.label()
+                    ));
+                    feed.next.remove(&net)
+                }
                 Some(next) => feed.next.insert(net, next),
                 None => feed.next.remove(&net),
             };
         }
-        if several {
+        if several || merged {
             feed.ids
                 .sort_by_key(|id| Reverse(self.posts.get(id).and_then(|p| p.created_at)));
         }
@@ -2589,16 +2641,31 @@ impl State {
         net: Network,
         clients: &mut Clients,
     ) -> Result<String, String> {
+        self.write_post_checked(text, reply_to, quote, net, clients)
+            .map_err(|err| err.to_string())
+    }
+
+    pub(crate) fn write_post_checked(
+        &mut self,
+        text: &str,
+        reply_to: Option<String>,
+        quote: Option<String>,
+        net: Network,
+        clients: &mut Clients,
+    ) -> Result<String, NetError> {
         let text = text.trim();
         if text.is_empty() {
-            return Err("empty post".into());
+            return Err(NetError::Other("empty post".into()));
         }
         if quote.is_some() {
-            self.check(net, "quotes", |caps| caps.quote)?;
+            self.check(net, "quotes", |caps| caps.quote)
+                .map_err(NetError::Other)?;
         } else if reply_to.is_some() {
-            self.check(net, "replies", |caps| caps.post)?;
+            self.check(net, "replies", |caps| caps.post)
+                .map_err(NetError::Other)?;
         } else {
-            self.check(net, "posts", |caps| caps.post)?;
+            self.check(net, "posts", |caps| caps.post)
+                .map_err(NetError::Other)?;
         }
         if self.demo {
             let native = format!("local-{}", self.posts.len() + 1);
@@ -2650,7 +2717,9 @@ impl State {
             reply_to,
             quote,
         };
-        let post = provider(clients, net)?.post(&draft)?;
+        let post = provider(clients, net)
+            .map_err(NetError::Other)?
+            .post(&draft)?;
         let url = post.permalink();
         self.keep(post);
         if let Some(id) = self.current_feed_id() {
@@ -2672,25 +2741,19 @@ impl State {
         if !on {
             self.check(net, "repost undo", |caps| caps.unrepost)?;
         }
+        if !self.demo {
+            provider(clients, net)?.set_repost(&id, on)?;
+        }
+        if let Some(post) = self.posts.get_mut(&id) {
+            set_counted_flag(&mut post.reposted, &mut post.metrics.reposts, on);
+        }
         if self.demo {
-            if let Some(post) = self.posts.get_mut(&id) {
-                post.reposted = on;
-                if on {
-                    post.metrics.reposts += 1;
-                } else {
-                    post.metrics.reposts = post.metrics.reposts.saturating_sub(1);
-                }
-            }
             self.confirm(if on {
                 "demo · reposted here only"
             } else {
                 "demo · unreposted here only"
             });
             return Ok(());
-        }
-        provider(clients, net)?.set_repost(&id, on)?;
-        if let Some(post) = self.posts.get_mut(&id) {
-            post.reposted = on;
         }
         self.confirm(if on { "reposted" } else { "unreposted" });
         Ok(())
@@ -2710,40 +2773,24 @@ impl State {
             Flag::Bookmark => self.check(net, "bookmarks", |caps| caps.bookmark)?,
         }
         let word = flag.word(net, on);
-        if self.demo {
-            if let Some(post) = self.posts.get_mut(&id) {
-                match flag {
-                    Flag::Like => {
-                        post.liked = on;
-                        if on {
-                            post.metrics.likes += 1;
-                        } else {
-                            post.metrics.likes = post.metrics.likes.saturating_sub(1);
-                        }
-                    }
-                    Flag::Bookmark => {
-                        post.bookmarked = on;
-                        if on {
-                            post.metrics.bookmarks += 1;
-                        } else {
-                            post.metrics.bookmarks = post.metrics.bookmarks.saturating_sub(1);
-                        }
-                    }
-                }
+        if !self.demo {
+            let provider = provider(clients, net)?;
+            match flag {
+                Flag::Like => provider.set_like(&id, on)?,
+                Flag::Bookmark => provider.set_bookmark(&id, on)?,
             }
-            self.confirm(format!("demo · {word} here only"));
-            return Ok(());
-        }
-        let provider = provider(clients, net)?;
-        match flag {
-            Flag::Like => provider.set_like(&id, on)?,
-            Flag::Bookmark => provider.set_bookmark(&id, on)?,
         }
         if let Some(post) = self.posts.get_mut(&id) {
             match flag {
-                Flag::Like => post.liked = on,
-                Flag::Bookmark => post.bookmarked = on,
+                Flag::Like => set_counted_flag(&mut post.liked, &mut post.metrics.likes, on),
+                Flag::Bookmark => {
+                    set_counted_flag(&mut post.bookmarked, &mut post.metrics.bookmarks, on)
+                }
             }
+        }
+        if self.demo {
+            self.confirm(format!("demo · {word} here only"));
+            return Ok(());
         }
         self.confirm(word);
         Ok(())
@@ -2855,6 +2902,9 @@ fn net_of(id: &str) -> Result<Network, String> {
 }
 
 fn provider(clients: &mut Clients, net: Network) -> Result<&mut dyn Provider, String> {
+    if let Some(message) = net.hold() {
+        return Err(message.into());
+    }
     clients
         .get(net)
         .ok_or_else(|| NetError::SignInRequired(net).into())
@@ -2954,6 +3004,17 @@ pub(crate) fn fetch_page(clients: &mut Clients, plan: &PagePlan) -> Fetched {
     }
 }
 
+fn set_counted_flag(flag: &mut bool, count: &mut u64, on: bool) {
+    if *flag != on {
+        *count = if on {
+            count.saturating_add(1)
+        } else {
+            count.saturating_sub(1)
+        };
+        *flag = on;
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Flag {
     Like,
@@ -2994,6 +3055,7 @@ mod tests {
     struct Scripted {
         calls: Arc<Mutex<Vec<String>>>,
         page: Option<Page>,
+        writes_succeed: bool,
     }
 
     impl Provider for Scripted {
@@ -3052,15 +3114,21 @@ mod tests {
         }
 
         fn set_like(&mut self, _: &str, _: bool) -> Result<(), NetError> {
-            Err(NetError::Other("unused".into()))
+            self.writes_succeed
+                .then_some(())
+                .ok_or_else(|| NetError::Other("write rejected".into()))
         }
 
         fn set_repost(&mut self, _: &str, _: bool) -> Result<(), NetError> {
-            Err(NetError::Other("unused".into()))
+            self.writes_succeed
+                .then_some(())
+                .ok_or_else(|| NetError::Other("write rejected".into()))
         }
 
         fn set_bookmark(&mut self, _: &str, _: bool) -> Result<(), NetError> {
-            Err(NetError::Other("unused".into()))
+            self.writes_succeed
+                .then_some(())
+                .ok_or_else(|| NetError::Other("write rejected".into()))
         }
 
         fn set_follow(&mut self, _: &str, _: bool) -> Result<(), NetError> {
@@ -3130,6 +3198,7 @@ mod tests {
         clients.stub(Scripted {
             calls: Arc::clone(&calls),
             page,
+            writes_succeed: false,
         });
         (clients, calls)
     }
@@ -3348,6 +3417,226 @@ mod tests {
         let feed = state.feeds.get(&FeedId::Merged).expect("feed");
         assert_eq!(feed.ids.len(), 3);
         assert_eq!(feed.next.get(&Network::X).map(String::as_str), Some("two"));
+    }
+
+    #[test]
+    fn a_partial_refresh_keeps_the_failed_networks_posts_and_cursor() {
+        let mut old = crate::fixtures::post("bluesky:old", None, 3);
+        old.net = Network::Bluesky;
+        let mut state = live(vec![old, crate::fixtures::post("x:old", None, 4)]);
+        let feed = state.feeds.get_mut(&FeedId::Merged).expect("feed");
+        feed.next.insert(Network::Bluesky, "retry-bsky".into());
+        feed.next.insert(Network::X, "old-x".into());
+        state
+            .merge(
+                FeedId::Merged,
+                vec![
+                    (
+                        Network::X,
+                        Ok(Page {
+                            ids: vec!["x:new".into()],
+                            posts: vec![crate::fixtures::post("x:new", None, 1)],
+                            next: Some("new-x".into()),
+                        }),
+                    ),
+                    (Network::Bluesky, Err(NetError::Other("offline".into()))),
+                ],
+                false,
+            )
+            .expect("the successful network refreshes");
+        let feed = state.feeds.get(&FeedId::Merged).expect("feed");
+        assert_eq!(feed.ids, ["x:new", "bluesky:old"]);
+        assert_eq!(
+            feed.next.get(&Network::Bluesky).map(String::as_str),
+            Some("retry-bsky")
+        );
+        assert_eq!(
+            feed.next.get(&Network::X).map(String::as_str),
+            Some("new-x")
+        );
+        assert!(feed
+            .notice
+            .as_deref()
+            .is_some_and(|notice| notice.contains("offline")));
+    }
+
+    #[test]
+    fn a_failed_append_preserves_the_page_for_an_explicit_retry() {
+        let mut state = paged(20);
+        let before = state.feeds.get(&FeedId::Merged).expect("feed").ids.clone();
+        let plan = state.plan_more().expect("plan").expect("next page");
+        state
+            .store_page(
+                plan,
+                Fetched::Pages(vec![(Network::X, Err(NetError::Other("offline".into())))]),
+            )
+            .expect_err("offline");
+        let feed = state.feeds.get(&FeedId::Merged).expect("feed");
+        assert_eq!(feed.ids, before);
+        assert_eq!(
+            feed.next.get(&Network::X).map(String::as_str),
+            Some("cursor")
+        );
+        assert!(state.plan_more().expect("retry plan").is_some());
+    }
+
+    #[test]
+    fn a_repeated_cursor_stops_pagination_without_discarding_posts() {
+        let mut state = paged(20);
+        let plan = state.plan_more().expect("page plan").expect("next page");
+        state
+            .store_page(
+                plan,
+                Fetched::Pages(vec![(
+                    Network::X,
+                    Ok(Page {
+                        ids: vec!["x:0".into(), "x:20".into()],
+                        posts: vec![
+                            crate::fixtures::post("x:0", None, 0),
+                            crate::fixtures::post("x:20", None, 20),
+                        ],
+                        next: Some("cursor".into()),
+                    }),
+                )]),
+            )
+            .expect("returned posts remain useful");
+        let feed = &state.feeds[&FeedId::Merged];
+        assert_eq!(feed.ids.len(), 21);
+        assert!(feed.ids.iter().any(|id| id == "x:20"));
+        assert!(feed
+            .notice
+            .as_deref()
+            .is_some_and(|notice| notice.contains("did not advance")));
+        assert!(state.plan_more().expect("plan").is_none());
+    }
+
+    #[test]
+    fn empty_cursors_are_normalized_to_the_last_page() {
+        for cursor in ["", "  "] {
+            let mut state = live(Vec::new());
+            state
+                .merge(
+                    FeedId::Merged,
+                    vec![(
+                        Network::X,
+                        Ok(Page {
+                            ids: vec!["x:post".into()],
+                            posts: vec![sample("x:post", None, "x:post")],
+                            next: Some(cursor.into()),
+                        }),
+                    )],
+                    false,
+                )
+                .expect("page");
+            assert!(state.feeds[&FeedId::Merged].next.is_empty());
+            assert!(state.plan_more().expect("plan").is_none());
+        }
+    }
+
+    #[test]
+    fn a_merged_append_sorts_when_only_one_network_has_more_pages() {
+        let mut old = crate::fixtures::post("bluesky:old", None, 3);
+        old.net = Network::Bluesky;
+        let mut state = live(vec![crate::fixtures::post("x:first", None, 1), old]);
+        state
+            .merge(
+                FeedId::Merged,
+                vec![(
+                    Network::X,
+                    Ok(Page {
+                        ids: vec!["x:next".into()],
+                        posts: vec![crate::fixtures::post("x:next", None, 2)],
+                        next: None,
+                    }),
+                )],
+                true,
+            )
+            .expect("append");
+        assert_eq!(
+            state.feeds[&FeedId::Merged].ids,
+            ["x:first", "x:next", "bluesky:old"]
+        );
+    }
+
+    #[test]
+    fn repeated_flag_commands_are_idempotent_in_demo_and_live_readers() {
+        for demo in [true, false] {
+            let mut state = live(vec![sample("x:post", None, "x:post")]);
+            state.demo = demo;
+            let mut clients = Clients::empty();
+            clients.stub(Scripted {
+                calls: Arc::new(Mutex::new(Vec::new())),
+                page: None,
+                writes_succeed: true,
+            });
+            for command in [
+                Cmd::Like { n: None },
+                Cmd::Bookmark { n: None },
+                Cmd::Repost { n: None },
+            ] {
+                state
+                    .apply(command.clone(), &mut clients)
+                    .expect("first write");
+                state.apply(command, &mut clients).expect("repeated write");
+            }
+            let post = &state.posts["x:post"];
+            assert!(post.liked && post.bookmarked && post.reposted);
+            assert_eq!(
+                (
+                    post.metrics.likes,
+                    post.metrics.bookmarks,
+                    post.metrics.reposts
+                ),
+                (1, 1, 1)
+            );
+            for command in [
+                Cmd::Unlike { n: None },
+                Cmd::Unbookmark { n: None },
+                Cmd::Unrepost { n: None },
+            ] {
+                state.apply(command.clone(), &mut clients).expect("undo");
+                state.apply(command, &mut clients).expect("repeated undo");
+            }
+            let post = &state.posts["x:post"];
+            assert!(!post.liked && !post.bookmarked && !post.reposted);
+            assert_eq!(
+                (
+                    post.metrics.likes,
+                    post.metrics.bookmarks,
+                    post.metrics.reposts
+                ),
+                (0, 0, 0)
+            );
+        }
+    }
+
+    #[test]
+    fn a_rejected_flag_write_preserves_flags_and_counts() {
+        let mut state = live(vec![sample("x:post", None, "x:post")]);
+        let before = state.posts["x:post"].clone();
+        let (mut clients, _) = scripted(None);
+        for command in [
+            Cmd::Like { n: None },
+            Cmd::Bookmark { n: None },
+            Cmd::Repost { n: None },
+        ] {
+            let error = state.apply(command, &mut clients).err().expect("rejected");
+            assert!(error.contains("write rejected"));
+            assert_eq!(state.posts["x:post"], before);
+        }
+    }
+
+    #[test]
+    fn flag_counts_saturate_at_their_bounds() {
+        let mut flag = false;
+        let mut count = u64::MAX;
+        set_counted_flag(&mut flag, &mut count, true);
+        assert!(flag);
+        assert_eq!(count, u64::MAX);
+        count = 0;
+        set_counted_flag(&mut flag, &mut count, false);
+        assert!(!flag);
+        assert_eq!(count, 0);
     }
 
     #[test]
@@ -4017,6 +4306,44 @@ mod tests {
         state.set_on(vec![Network::Bluesky]);
         assert_eq!(state.initial_target(), Some(Network::Bluesky));
         assert_eq!(state.post_targets(), Network::ALL.to_vec());
+    }
+
+    #[test]
+    fn a_live_session_leaves_threads_out() {
+        let mut saved = Config::default();
+        saved.feed.networks = Some(vec!["threads".into(), "x".into()]);
+        saved.default_network = Some("threads".into());
+        let mut state = State::boot(false, 15, &saved, &Clients::empty(), None);
+        state.nets.push(NetInfo {
+            net: Network::Threads,
+            signed_in: true,
+            caps: Network::Threads.caps(),
+            handle: Some("ada".into()),
+        });
+        assert_eq!(
+            state.held(Network::Threads),
+            Some("Waiting for Meta approval")
+        );
+        assert!(!state.available().contains(&Network::Threads));
+        assert!(!state
+            .chips()
+            .iter()
+            .any(|(net, _, _)| *net == Network::Threads));
+        assert!(!state.post_targets().contains(&Network::Threads));
+        assert!(state.on.iter().all(|net| *net != Network::Threads));
+        state
+            .apply(
+                Cmd::Scope(Scope::One(Network::Threads)),
+                &mut Clients::empty(),
+            )
+            .unwrap();
+        assert_eq!(state.status, "Waiting for Meta approval");
+        assert_eq!(
+            state
+                .check(Network::Threads, "search", |caps| caps.search)
+                .unwrap_err(),
+            "Waiting for Meta approval"
+        );
     }
     #[test]
     fn demo_thread_shows_the_original_once_when_opened_from_either_record() {

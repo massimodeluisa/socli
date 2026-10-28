@@ -25,7 +25,9 @@ Importing that session imitates the x.com web client. The calls use the public w
 
 SoCLI's X app is compiled in. "A different account on x.com" and the page both approve that app. The terminal returns to `https://socli.sh/`, and socli.sh sends the browser on to `http://127.0.0.1:8741/callback`. The reader on socli.sh returns to `https://socli.sh/` from the homepage and to `https://socli.sh/web/` from the full-screen page. A reader on this machine uses `http://127.0.0.1:5174/` or `http://127.0.0.1:5174/web/`. `--client-id` uses a different app, which needs `http://127.0.0.1:8741/callback` saved on that app.
 
-The default scopes are `tweet.read tweet.write users.read bookmark.read bookmark.write offline.access`. The scope `offline.access` is what makes X issue a refresh token.
+The default scopes are `tweet.read tweet.write users.read like.write follows.write bookmark.read bookmark.write offline.access`. Sign in again with `socli login x --oauth` if your existing OAuth session lacks `like.write` or `follows.write`. Refreshing a token does not grant new permissions.
+
+The scope `offline.access` is what makes X issue a refresh token.
 
 The environment variables are `X_AUTH_TOKEN`, `X_CT0`, `X_CLIENT_ID`, `X_CLIENT_SECRET`, `X_ACCESS_TOKEN`, `X_REFRESH_TOKEN`, `X_USER_ID`, `X_USERNAME` and `X_BEARER_TOKEN`. Both cookie variables together are a browser session. An app-only bearer token is enough for public reads, and `socli auth x bearer <token>` stores one.
 
@@ -54,6 +56,8 @@ The default device name is `SoCLI on <short hostname>`, and names are limited to
 `socli auth devnull ssh` picks the GitHub SSH key that signs your commits, which lets you post without an approved device. Use `--key <path>` to choose a key explicitly.
 
 ## Threads
+
+Live Threads sign-in is held. `socli login threads`, a pasted token, `socli auth threads oauth` and `socli auth threads refresh` answer Waiting for Meta approval and do not open a browser or call Meta. `socli logout threads` still clears a stored token. That hold is outside `--demo`. The notes below describe the flow for when the hold is lifted.
 
 `socli login threads` opens Threads and asks you to approve SoCLI. The terminal returns to `https://socli.sh/`, and socli.sh sends the browser on to `http://127.0.0.1:8742/threads/callback`. The code goes to `https://socli.sh/threads/token`, which returns a 60-day token. The app secret stays on that exchange. The full-screen reader returns to `https://socli.sh/web/`. Threads does not accept an `http://` redirect, so a reader on this machine cannot finish that approval. SoCLI's Threads app is compiled in. An empty `SOCLI_THREADS_APP_ID` at compile time is a build that says it has no app and does not ask you to create one. The Threads app is published.
 

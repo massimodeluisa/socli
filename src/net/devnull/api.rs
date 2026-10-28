@@ -6,7 +6,7 @@ use url::Url;
 
 use super::sign;
 use crate::net::http::header::{ACCEPT, CONTENT_TYPE, RETRY_AFTER};
-use crate::net::http::{Client, Error, Method, Response};
+use crate::net::http::{self, Client, Method, Response};
 use crate::net::{NetError, Network};
 
 pub const ORIGIN: &str = "https://dev-null.sh";
@@ -48,6 +48,7 @@ pub fn request(
             .map_err(|e| NetError::Other(format!("could not encode the request: {e}")))?,
         None => Vec::new(),
     };
+    let mutation = method != Method::GET;
     let mut builder = http
         .request(method.clone(), url.clone())
         .header(ACCEPT, "application/json");
@@ -65,11 +66,14 @@ pub fn request(
     if body.is_some() {
         builder = builder.header(CONTENT_TYPE, "application/json").body(bytes);
     }
-    let response = builder.send().map_err(unreachable)?;
-    check(response)
+    let response = builder
+        .send()
+        .map_err(|error| http::transport_error(NET, error, mutation))?;
+    check(response, mutation)
 }
 
 /// A plain-text POST to one of the `/api/cli` endpoints the commit script uses.
+#[cfg(feature = "native")]
 pub fn post_text(
     http: &Client,
     segments: &[&str],
@@ -83,34 +87,26 @@ pub fn post_text(
     if let Some(signature) = signature {
         builder = builder.header("X-SSH-Signature", signature);
     }
-    let response = builder.send().map_err(unreachable)?;
-    check(response)?.text().map_err(|e| NetError::Parse {
-        net: NET,
-        message: e.to_string(),
-    })
+    let response = builder
+        .send()
+        .map_err(|error| http::transport_error(NET, error, true))?;
+    http::read_text(check(response, true)?)
+        .map_err(|message| NetError::OutcomeUnknown { net: NET, message })
 }
 
 pub fn json<T: DeserializeOwned>(response: Response) -> Result<T, NetError> {
-    response.json().map_err(|e| NetError::Parse {
+    let body = text(response)?;
+    serde_json::from_str(&body).map_err(|e| NetError::Parse {
         net: NET,
         message: e.to_string(),
     })
 }
 
 pub fn text(response: Response) -> Result<String, NetError> {
-    response.text().map_err(|e| NetError::Parse {
-        net: NET,
-        message: e.to_string(),
-    })
+    http::read_text(response).map_err(|message| NetError::Parse { net: NET, message })
 }
 
-fn unreachable(err: Error) -> NetError {
-    NetError::Other(format!(
-        "could not reach dev/null ({err}). check your connection and try again"
-    ))
-}
-
-fn check(response: Response) -> Result<Response, NetError> {
+fn check(response: Response, mutation: bool) -> Result<Response, NetError> {
     let status = response.status();
     if status.is_success() {
         return Ok(response);
@@ -120,7 +116,13 @@ fn check(response: Response) -> Result<Response, NetError> {
         .get(RETRY_AFTER)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.trim().parse().ok());
-    let body = response.text().unwrap_or_default();
+    let body = http::read_text(response).unwrap_or_default();
+    if mutation && status.as_u16() >= 500 {
+        return Err(NetError::OutcomeUnknown {
+            net: NET,
+            message: error_for(status.as_u16(), retry_after, &body).to_string(),
+        });
+    }
     Err(error_for(status.as_u16(), retry_after, &body))
 }
 

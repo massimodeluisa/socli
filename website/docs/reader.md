@@ -25,6 +25,8 @@ The [Keys reference](keys.html) lists reader shortcuts and the controls for the 
 
 The detail level sets how much art the reader and `--print` draw. Pick it with `--detail`, `SOCLI_DETAIL` or `ui.detail`. With none of those set, a normal terminal opens at rich. An ESP terminal, or a `TERM` of `dumb`, `unknown`, `ansi`, `vt52`, `vt100`, `vt102`, `vt220` or `network`, opens at plain.
 
+For the pictures in `rich`, use [Ghostty](https://ghostty.org/docs/install/binary) instead of Terminal.app. Install it from the [official installation page](https://ghostty.org/docs/install/binary). [Images](images.html) describes what each terminal can draw.
+
 | Level | What it draws |
 | --- | --- |
 | `plain` | No color, ASCII chrome, and `>` marks the selected post |

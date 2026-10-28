@@ -33,6 +33,8 @@ pub enum ApiError {
     #[error("X rate limit reached")]
     RateLimited { retry_after: Option<u64> },
     #[error("{0}")]
+    OutcomeUnknown(String),
+    #[error("{0}")]
     Other(String),
 }
 
@@ -74,6 +76,16 @@ enum Call {
     OtherWrite,
 }
 
+impl Call {
+    fn response_failure(self, message: String) -> ApiError {
+        if matches!(self, Self::Read) {
+            ApiError::Other(message)
+        } else {
+            ApiError::OutcomeUnknown(message)
+        }
+    }
+}
+
 pub struct XClient {
     http: Client,
     creds: Credentials,
@@ -107,6 +119,14 @@ impl XClient {
             web_origin,
             viewer: Mutex::new(None),
         }
+    }
+
+    fn api_origin(&self) -> &str {
+        #[cfg(test)]
+        if let Some(origin) = self.web_origin.as_deref() {
+            return origin;
+        }
+        "https://api.x.com"
     }
 
     pub(super) fn web_origin(&self) -> &str {
@@ -311,14 +331,17 @@ impl XClient {
             .pointer("/data/id")
             .and_then(|v| v.as_str())
             .map(str::to_string)
-            .ok_or_else(|| ApiError::Other("X accepted the post but returned no id".into()))
+            .ok_or_else(|| {
+                ApiError::OutcomeUnknown("X accepted the post but returned no id".into())
+            })
     }
 
     pub fn delete_post(&self, id: &str) -> Result<(), ApiError> {
         if self.creds.uses_web() {
             return self.web_delete(id);
         }
-        self.delete(&format!("/2/tweets/{id}"), Call::OtherWrite)?;
+        let value = self.delete(&format!("/2/tweets/{id}"), Call::OtherWrite)?;
+        require_state(&value, "deleted", true)?;
         Ok(())
     }
 
@@ -327,12 +350,12 @@ impl XClient {
             return self.web_repost(tweet_id, true);
         }
         let id = self.user_id()?;
-        self.post(
+        let value = self.post(
             &format!("/2/users/{id}/retweets"),
             json!({ "tweet_id": tweet_id }),
             Call::Repost,
         )?;
-        Ok(())
+        require_state(&value, "retweeted", true)
     }
 
     pub fn unrepost(&mut self, tweet_id: &str) -> Result<(), ApiError> {
@@ -340,8 +363,8 @@ impl XClient {
             return self.web_repost(tweet_id, false);
         }
         let id = self.user_id()?;
-        self.delete(&format!("/2/users/{id}/retweets/{tweet_id}"), Call::Repost)?;
-        Ok(())
+        let value = self.delete(&format!("/2/users/{id}/retweets/{tweet_id}"), Call::Repost)?;
+        require_state(&value, "retweeted", false)
     }
 
     pub fn bookmark(&mut self, tweet_id: &str) -> Result<(), ApiError> {
@@ -349,12 +372,12 @@ impl XClient {
             return self.web_bookmark(tweet_id, true);
         }
         let id = self.user_id()?;
-        self.post(
+        let value = self.post(
             &format!("/2/users/{id}/bookmarks"),
             json!({ "tweet_id": tweet_id }),
             Call::Bookmark,
         )?;
-        Ok(())
+        require_state(&value, "bookmarked", true)
     }
 
     pub fn unbookmark(&mut self, tweet_id: &str) -> Result<(), ApiError> {
@@ -362,11 +385,11 @@ impl XClient {
             return self.web_bookmark(tweet_id, false);
         }
         let id = self.user_id()?;
-        self.delete(
+        let value = self.delete(
             &format!("/2/users/{id}/bookmarks/{tweet_id}"),
             Call::Bookmark,
         )?;
-        Ok(())
+        require_state(&value, "bookmarked", false)
     }
 
     pub fn like(&mut self, tweet_id: &str) -> Result<(), ApiError> {
@@ -374,12 +397,12 @@ impl XClient {
             return self.web_like(tweet_id, true);
         }
         let id = self.user_id()?;
-        self.post(
+        let value = self.post(
             &format!("/2/users/{id}/likes"),
             json!({ "tweet_id": tweet_id }),
             Call::Like,
         )?;
-        Ok(())
+        require_state(&value, "liked", true)
     }
 
     pub fn unlike(&mut self, tweet_id: &str) -> Result<(), ApiError> {
@@ -387,8 +410,8 @@ impl XClient {
             return self.web_like(tweet_id, false);
         }
         let id = self.user_id()?;
-        self.delete(&format!("/2/users/{id}/likes/{tweet_id}"), Call::Like)?;
-        Ok(())
+        let value = self.delete(&format!("/2/users/{id}/likes/{tweet_id}"), Call::Like)?;
+        require_state(&value, "liked", false)
     }
 
     pub fn follow(&mut self, target_user_id: &str) -> Result<(), ApiError> {
@@ -452,7 +475,7 @@ impl XClient {
     fn get(&self, path: &str, query: &[(&str, &str)], call: Call) -> Result<Value, ApiError> {
         self.send(
             self.http
-                .get(format!("https://api.x.com{path}"))
+                .get(format!("{}{path}", self.api_origin()))
                 .query(query),
             call,
         )
@@ -475,14 +498,17 @@ impl XClient {
     fn post(&self, path: &str, body: Value, call: Call) -> Result<Value, ApiError> {
         self.send(
             self.http
-                .post(format!("https://api.x.com{path}"))
+                .post(format!("{}{path}", self.api_origin()))
                 .json(&body),
             call,
         )
     }
 
     fn delete(&self, path: &str, call: Call) -> Result<Value, ApiError> {
-        self.send(self.http.delete(format!("https://api.x.com{path}")), call)
+        self.send(
+            self.http.delete(format!("{}{path}", self.api_origin())),
+            call,
+        )
     }
 
     fn send(&self, req: RequestBuilder, call: Call) -> Result<Value, ApiError> {
@@ -490,24 +516,32 @@ impl XClient {
         let response = req
             .bearer_auth(token)
             .send()
-            .map_err(|e| ApiError::Other(format!("network: {e}")))?;
+            .map_err(|error| request_failure(error, !matches!(call, Call::Read)))?;
         let status = response.status();
         if status == StatusCode::TOO_MANY_REQUESTS {
             return Err(ApiError::RateLimited {
                 retry_after: retry_after(response.headers(), unix_now()),
             });
         }
-        let text = response
-            .text()
-            .map_err(|e| ApiError::Other(format!("reading the X response: {e}")))?;
+        let text = crate::net::http::read_text(response)
+            .map_err(|error| call.response_failure(format!("reading the X response: {error}")))?;
         if !status.is_success() {
             return Err(ApiError::http(status, &text, call));
         }
         if text.trim().is_empty() {
             return Ok(Value::Null);
         }
-        serde_json::from_str(&text)
-            .map_err(|e| ApiError::Other(format!("X returned non-JSON: {e}")))
+        let value: Value = serde_json::from_str(&text)
+            .map_err(|e| call.response_failure(format!("X returned non-JSON: {e}")))?;
+        if value
+            .get("errors")
+            .and_then(Value::as_array)
+            .is_some_and(|errors| !errors.is_empty())
+            && value.get("data").is_none_or(Value::is_null)
+        {
+            return Err(ApiError::http(StatusCode::FORBIDDEN, &text, call));
+        }
+        Ok(value)
     }
 
     fn token_for(&self, call: Call) -> Result<&str, ApiError> {
@@ -536,8 +570,30 @@ impl XClient {
     }
 }
 
+pub(super) fn request_failure(error: crate::net::http::Error, mutation: bool) -> ApiError {
+    match crate::net::http::transport_error(Network::X, error, mutation) {
+        crate::net::NetError::OutcomeUnknown { message, .. } => ApiError::OutcomeUnknown(message),
+        error => ApiError::Other(error.to_string()),
+    }
+}
+
+fn require_state(value: &Value, field: &str, expected: bool) -> Result<(), ApiError> {
+    if value
+        .get("data")
+        .and_then(|data| data.get(field))
+        .and_then(Value::as_bool)
+        == Some(expected)
+    {
+        Ok(())
+    } else {
+        Err(ApiError::OutcomeUnknown(format!(
+            "X did not confirm {field}={expected}"
+        )))
+    }
+}
+
 /** Seconds until X's window resets: `x-rate-limit-reset` is a Unix time, and `retry-after` is the fallback. */
-fn retry_after(headers: &header::HeaderMap, now: u64) -> Option<u64> {
+pub(super) fn retry_after(headers: &header::HeaderMap, now: u64) -> Option<u64> {
     let number = |name: &str| {
         headers
             .get(name)
@@ -564,7 +620,7 @@ fn post_body(text: &str, reply_to: Option<&str>) -> Value {
 
 fn hint_for(status: StatusCode, call: Call, detail: &str) -> String {
     let policy = match call {
-        Call::Like | Call::Follow => Some(
+        Call::Like | Call::Follow if status.as_u16() == 403 => Some(
             "Like and follow writes were pulled from self-serve tiers (announced for 20 Apr 2026) and need Enterprise. Repost, bookmark, post, and reply are still on pay-per-use.",
         ),
         Call::Reply if status.as_u16() == 403 => Some(
@@ -654,6 +710,7 @@ pub fn parse_page(value: Value) -> Page {
     let next = value
         .pointer("/meta/next_token")
         .and_then(|v| v.as_str())
+        .filter(|token| !token.is_empty())
         .map(str::to_string);
     Page {
         ids,
@@ -958,6 +1015,78 @@ fn index_media(value: Option<&Value>) -> HashMap<String, Media> {
 mod tests {
     use super::*;
     use reqwest::header::{HeaderMap, HeaderValue};
+
+    fn reply(body: &'static str, status: &'static str) -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            use std::io::{Read, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .unwrap();
+            let mut request = [0u8; 8192];
+            let _ = stream.read(&mut request);
+            let response = format!(
+                "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(response.as_bytes());
+        });
+        format!("http://{addr}")
+    }
+
+    fn signed_client(origin: String) -> XClient {
+        XClient::for_test(
+            Credentials {
+                access_token: Some("test-token".into()),
+                user_id: Some("self".into()),
+                ..Credentials::default()
+            },
+            origin,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn likes_require_the_requested_state_in_the_response() {
+        let mut client = signed_client(reply(r#"{"data":{"liked":false}}"#, "200 OK"));
+        assert!(matches!(
+            client.like("post"),
+            Err(ApiError::OutcomeUnknown(_))
+        ));
+        let mut client = signed_client(reply(r#"{"data":{"liked":true}}"#, "200 OK"));
+        client.like("post").unwrap();
+        let mut client = signed_client(reply(r#"{"data":{"liked":false}}"#, "200 OK"));
+        client.unlike("post").unwrap();
+    }
+
+    #[test]
+    fn successful_http_status_cannot_hide_a_rejection() {
+        let mut client =
+            signed_client(reply(r#"{"errors":[{"message":"not allowed"}]}"#, "200 OK"));
+        let error = client.like("post").unwrap_err();
+        assert!(matches!(error, ApiError::Failed { .. }));
+        assert!(error.to_string().contains("not allowed"));
+    }
+
+    #[test]
+    fn lost_or_invalid_write_responses_are_uncertain() {
+        for (body, status) in [("not json", "200 OK"), ("", "204 No Content")] {
+            let mut client = signed_client(reply(body, status));
+            assert!(matches!(
+                client.like("post"),
+                Err(ApiError::OutcomeUnknown(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn authentication_hints_are_not_hidden_by_like_policy_hints() {
+        let error = ApiError::http(StatusCode::UNAUTHORIZED, "", Call::Like).to_string();
+        assert!(error.contains("socli login x"));
+        assert!(!error.contains("Enterprise"));
+    }
 
     #[test]
     fn business_follows_verified_type() {

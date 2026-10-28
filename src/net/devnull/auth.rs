@@ -104,7 +104,9 @@ pub fn login(device_name: Option<String>) -> Result<(), String> {
                 None,
             )?;
             let me_text = api::text(me)?;
-            flow::username_from_body(&me_text).unwrap_or_default()
+            flow::username_from_body(&me_text).ok_or_else(|| {
+                "dev/null approved the device without a username. run `socli login devnull` again".to_string()
+            })?
         }
     };
     config::update(|cfg| {

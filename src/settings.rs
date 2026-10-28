@@ -77,8 +77,11 @@ fn fit(text: &str, col: usize, next: Option<usize>, width: usize) -> String {
     util::truncate(text, room)
 }
 
-/// `@handle` when `net` is signed in, otherwise `not signed in`.
+/// `@handle` when `net` is signed in, the hold message when that network is paused, otherwise `not signed in`.
 fn account_label(state: &State, net: Network) -> String {
+    if let Some(message) = state.held(net) {
+        return message.to_string();
+    }
     match state
         .handle_of(net)
         .filter(|_| state.available().contains(&net))
@@ -101,6 +104,9 @@ pub fn not_signed_in(net: Network) -> String {
 
 /// Turns `net` on or off in `on`; a network that is not signed in, or the last one on, stays.
 pub fn toggle(state: &State, on: &mut Vec<Network>, net: Network) -> Result<(), String> {
+    if let Some(message) = state.held(net) {
+        return Err(message.into());
+    }
     if !state.available().contains(&net) {
         return Err(not_signed_in(net));
     }
@@ -153,8 +159,11 @@ pub fn page_len(state: &State) -> usize {
     }
 }
 
-/// `login` when `net` is signed out, otherwise `logout`.
+/// `login` when `net` is signed out, `logout` when it is signed in, or the hold message when it is paused.
 pub fn account_action(state: &State, net: Network) -> &'static str {
+    if let Some(message) = state.held(net) {
+        return message;
+    }
     if state.available().contains(&net) {
         "logout"
     } else {
@@ -162,10 +171,15 @@ pub fn account_action(state: &State, net: Network) -> &'static str {
     }
 }
 
-/// Whether canvas column `col` is on the login or logout word of a network row.
+/// Whether canvas column `col` is on the login, logout, or hold word of a network row.
 pub fn on_account_action(state: &State, net: Network, col: usize) -> bool {
-    let end = HINT + account_action(state, net).len();
-    (HINT..end).contains(&col)
+    let word = account_action(state, net);
+    let start = if state.held(net).is_some() {
+        ACCOUNT
+    } else {
+        HINT
+    };
+    (start..start + word.len()).contains(&col)
 }
 
 pub fn step(state: &mut State, row: Row, dir: i32) -> Option<(String, String)> {
@@ -321,18 +335,7 @@ pub fn lines(state: &State, width: usize) -> (Vec<StyledLine>, Option<RowSpan>, 
             if on { Kind::Fg } else { Kind::Dim },
             &fit(net.title(), NAME, Some(ACCOUNT), width),
         );
-        canvas.put(
-            y,
-            ACCOUNT,
-            Kind::Dim,
-            &fit(&account_label(state, net), ACCOUNT, Some(HINT), width),
-        );
-        canvas.put(
-            y,
-            HINT,
-            if here { Kind::Bold } else { Kind::Fg },
-            account_action(state, net),
-        );
+        paint_session(&mut canvas, state, net, y, here, width);
         if COLOR < width {
             canvas.put(y, COLOR, Kind::Dim, &fit("color", COLOR, Some(MARK), width));
             if MARK < width {
@@ -512,6 +515,38 @@ pub fn lines(state: &State, width: usize) -> (Vec<StyledLine>, Option<RowSpan>, 
     (canvas.finish(), span, hits)
 }
 
+/// The handle, or the hold message when the account column would cut it. `login` and `logout` stay at `HINT`.
+fn paint_session(
+    canvas: &mut Canvas,
+    state: &State,
+    net: Network,
+    y: usize,
+    here: bool,
+    width: usize,
+) {
+    if let Some(message) = state.held(net) {
+        canvas.put(
+            y,
+            ACCOUNT,
+            if here { Kind::Bold } else { Kind::Fg },
+            &fit(message, ACCOUNT, Some(COLOR), width),
+        );
+        return;
+    }
+    canvas.put(
+        y,
+        ACCOUNT,
+        Kind::Dim,
+        &fit(&account_label(state, net), ACCOUNT, Some(HINT), width),
+    );
+    canvas.put(
+        y,
+        HINT,
+        if here { Kind::Bold } else { Kind::Fg },
+        account_action(state, net),
+    );
+}
+
 /// The accounts page: one row per network, `login` or `logout`.
 fn account_lines(state: &State, width: usize) -> (Vec<StyledLine>, Option<RowSpan>, Vec<Hit>) {
     let mut canvas = Canvas::new(width);
@@ -553,18 +588,7 @@ fn account_lines(state: &State, width: usize) -> (Vec<StyledLine>, Option<RowSpa
             if signed { Kind::Fg } else { Kind::Dim },
             &fit(net.title(), NAME, Some(ACCOUNT), width),
         );
-        canvas.put(
-            y,
-            ACCOUNT,
-            Kind::Dim,
-            &fit(&account_label(state, net), ACCOUNT, Some(HINT), width),
-        );
-        canvas.put(
-            y,
-            HINT,
-            if here { Kind::Bold } else { Kind::Fg },
-            account_action(state, net),
-        );
+        paint_session(&mut canvas, state, net, y, here, width);
     }
     let span = focus.map(|y| RowSpan {
         start: y,
@@ -888,6 +912,40 @@ mod tests {
         assert_eq!(focus, Some(RowSpan { start: 3, end: 4 }));
         assert_eq!(account_action(&state, Network::X), "logout");
         assert_eq!(account_action(&state, Network::Threads), "login");
+    }
+
+    #[test]
+    fn live_threads_shows_the_hold_instead_of_login() {
+        let mut state = State::boot(false, 15, &Config::default(), &Clients::empty(), None);
+        state.icons = false;
+        let (main, _, _) = lines(&state, 100);
+        let main: Vec<String> = main.iter().map(StyledLine::plain).collect();
+        let row = main.iter().find(|line| line.contains("Threads")).unwrap();
+        assert!(row.contains("Waiting for Meta approval"), "{row}");
+        assert!(!row.contains("login"), "{row}");
+        state.open_accounts();
+        let (page, _, _) = lines(&state, 100);
+        let page: Vec<String> = page.iter().map(StyledLine::plain).collect();
+        let row = page.iter().find(|line| line.contains("Threads")).unwrap();
+        assert!(row.contains("Waiting for Meta approval"), "{row}");
+        assert!(!row.contains("login"), "{row}");
+        let panel_rows: Vec<String> = panel(&state, &[], 3, 100)
+            .iter()
+            .map(StyledLine::plain)
+            .collect();
+        let filter = panel_rows
+            .iter()
+            .find(|line| line.contains("Threads"))
+            .unwrap();
+        assert!(filter.contains("Waiting for Meta approval"), "{filter}");
+        assert_eq!(
+            toggle(&state, &mut vec![Network::X], Network::Threads).unwrap_err(),
+            "Waiting for Meta approval"
+        );
+        assert_eq!(
+            account_action(&state, Network::Threads),
+            "Waiting for Meta approval"
+        );
     }
 
     #[test]

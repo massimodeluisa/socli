@@ -525,10 +525,16 @@ fn choice(
     selected: bool,
     ascii: bool,
 ) {
-    let (name, act, action) = if let Some(net) = Network::ALL.get(index) {
-        (net.title(), Act::SignIn(*net), "sign in")
+    let (name, act, action, always) = if let Some(net) = Network::ALL.get(index) {
+        let held = net.hold();
+        (
+            net.title(),
+            Act::SignIn(*net),
+            held.unwrap_or("sign in"),
+            held.is_some(),
+        )
     } else {
-        ("Explore the demo", Act::EnterDemo, "open")
+        ("Explore the demo", Act::EnterDemo, "open", false)
     };
     // From column 2 the name shares the wordmark's edge and the mark sits in the gutter.
     let gutter = x >= 2;
@@ -572,7 +578,8 @@ fn choice(
         name_kind,
         &format!("{} ", util::truncate(name, room)),
     );
-    if selected && origin + span >= col + 2 + action.width() {
+    // Welcome does not paint the status line, so a held network says why on its own row.
+    if (selected || always) && origin + span >= col + 2 + action.width() {
         put(canvas, y, origin + span - action.width(), Kind::Dim, action);
     }
     canvas.target(y, origin, origin + span, act);
@@ -618,6 +625,11 @@ mod tests {
         assert_ne!(a, b, "the water advances\n{a}");
         assert!(a.contains(LEAD), "{a}");
         assert!(a.contains(ABOUT), "{a}");
+        let threads = a
+            .lines()
+            .find(|line| line.contains("Threads"))
+            .unwrap_or("");
+        assert!(threads.contains("Waiting for Meta approval"), "{threads}");
         assert!(a.contains('%') || a.contains('@'), "{a}");
         assert!(first
             .targets

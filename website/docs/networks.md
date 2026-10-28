@@ -55,7 +55,7 @@ The dev/null API has no search, reposts or bookmarks. Its private list is your s
 
 ## Threads
 
-`socli login threads` opens Threads so you can approve SoCLI. `socli login threads --token <token>` stores a token you already have, and `socli auth threads oauth` runs the personal-app flow with a pasted redirect. The Threads API has no home timeline, so SoCLI's only feed there is your own threads. It also has no likes, bookmarks or follows, no way to undo a repost, and no profile endpoint for other accounts. SoCLI does not request reply or like counts from Threads.
+`socli login threads`, a pasted token, and `socli auth threads oauth` answer Waiting for Meta approval and do not call Meta. Outside `--demo`, a live session leaves Threads out of the feed. The Threads API has no home timeline, so SoCLI's only feed there is your own threads. It also has no likes, bookmarks or follows, no way to undo a repost, and no profile endpoint for other accounts. SoCLI does not request reply or like counts from Threads.
 
 A Threads quote is native when the quoted post is on Threads, and your text plus the link otherwise. Until Meta approves the keyword search permission for your app, search covers only your own posts, and until it approves publishing for advanced access, the app can post only for its testers. The API cannot turn a post link into an id, so `socli thread` on a Threads link asks for the id from `socli --json` instead.
 

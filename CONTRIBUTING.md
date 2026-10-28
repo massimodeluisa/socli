@@ -62,7 +62,7 @@ cargo tree --locked --target wasm32-unknown-unknown --no-default-features --pref
 A change to the JavaScript bridge also runs:
 
 ```sh
-bun test scripts/release.test.ts scripts/soclib.test.ts
+bun test scripts/release.test.ts scripts/soclib.test.ts scripts/install.test.ts
 ```
 
 The native npm launcher is `soclish`. The browser library is `@massimodeluisa/soclib`.

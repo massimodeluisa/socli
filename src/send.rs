@@ -57,6 +57,38 @@ pub struct Done {
 /// Each network's answer, in network order.
 pub type Results = Vec<(Network, Result<Done, String>)>;
 
+struct SendFailure {
+    message: String,
+    uncertain: bool,
+}
+
+impl From<String> for SendFailure {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            uncertain: false,
+        }
+    }
+}
+
+impl From<NetError> for SendFailure {
+    fn from(error: NetError) -> Self {
+        Self {
+            uncertain: error.outcome_unknown(),
+            message: error.to_string(),
+        }
+    }
+}
+
+fn messages(
+    results: Vec<(Network, Result<Sent, SendFailure>)>,
+) -> Vec<(Network, Result<Sent, String>)> {
+    results
+        .into_iter()
+        .map(|(net, result)| (net, result.map_err(|error| error.message)))
+        .collect()
+}
+
 /**
 Posts `text` to each target in network order and returns the new post's id, URL and sent text per
 network. Replies go only to the parent's network. A quote is native only on the quoted post's own
@@ -71,7 +103,7 @@ pub fn send(
     reply_to: Option<String>,
     quote: Option<String>,
 ) -> Vec<(Network, Result<Sent, String>)> {
-    send_with(
+    messages(send_with(
         state,
         clients,
         text,
@@ -79,7 +111,7 @@ pub fn send(
         reply_to,
         quote,
         ONE_SHOT_HINT,
-    )
+    ))
 }
 
 /// What `send_intent` did: the draft id it kept, each network's answer, and the draft update after.
@@ -110,7 +142,8 @@ Sends `intent` with a durable record in the drafts file `store`. Before any netw
 intent is written as a draft (under `intent.draft_id` when it has one) with `sending` set to every
 addressed network, and nothing is sent when that write fails. After the send, one transaction
 removes the draft when every network took the post, or rewrites the same draft with only the
-networks that failed.
+networks that failed. An unconfirmed outcome keeps that network in `sending` so reopening the
+draft warns against posting a duplicate.
 */
 pub fn send_intent(
     state: &mut State,
@@ -141,12 +174,18 @@ pub fn send_intent(
         intent.quote.clone(),
         hint,
     );
+    let uncertain: Vec<Network> = results
+        .iter()
+        .filter(|(_, result)| result.as_ref().is_err_and(|error| error.uncertain))
+        .map(|(net, _)| *net)
+        .collect();
+    let results = messages(results);
     let failed = refused(&results);
     let kept = drafts::update_at(store, |drafts| {
         if failed.is_empty() {
             drafts.retain(|draft| draft.id != id);
         } else {
-            record(drafts, slugs(&failed), Vec::new());
+            record(drafts, slugs(&failed), slugs(&uncertain));
         }
         Ok(())
     });
@@ -155,13 +194,18 @@ pub fn send_intent(
 
 /**
 Writes `intent` to the drafts file `store` as its draft (under `intent.draft_id`, or a new id) with
-nothing in flight, so the draft holds exactly what a composer dry run previewed.
+the text a composer dry run previewed, preserving any earlier unconfirmed send warning.
 */
 pub fn keep(state: &State, intent: &Intent, store: &Path) -> Result<(), String> {
     let id = draft_id(intent);
     let handle = handle_of(state, intent);
     drafts::update_at(store, |drafts| {
-        put_draft(drafts, &id, intent, handle, intent.slugs(), Vec::new());
+        let sending = drafts
+            .iter()
+            .find(|draft| draft.id == id)
+            .map(|draft| draft.sending.clone())
+            .unwrap_or_default();
+        put_draft(drafts, &id, intent, handle, intent.slugs(), sending);
         Ok(())
     })
 }
@@ -216,12 +260,13 @@ fn send_with(
     reply_to: Option<String>,
     quote: Option<String>,
     hint: &str,
-) -> Vec<(Network, Result<Sent, String>)> {
+) -> Vec<(Network, Result<Sent, SendFailure>)> {
     nets_for(targets, reply_to.as_deref())
         .into_iter()
         .map(|net| {
-            let result =
-                draft_for(state, net, text, quote.as_deref(), hint).and_then(|(text, native)| {
+            let result = draft_for(state, net, text, quote.as_deref(), hint)
+                .map_err(SendFailure::from)
+                .and_then(|(text, native)| {
                     fits(net, text.trim())?;
                     write(state, clients, &text, reply_to.clone(), native, net)
                 });
@@ -303,9 +348,9 @@ fn write(
     reply_to: Option<String>,
     quote: Option<String>,
     net: Network,
-) -> Result<Sent, String> {
+) -> Result<Sent, SendFailure> {
     let before: HashSet<String> = state.posts.keys().cloned().collect();
-    let note = state.write_post(text, reply_to, quote, net, clients)?;
+    let note = state.write_post_checked(text, reply_to, quote, net, clients)?;
     let sent = text.trim();
     let post = state
         .posts
@@ -570,6 +615,74 @@ mod tests {
     use super::*;
     use crate::config::Config;
 
+    struct RefusingProvider(Option<NetError>);
+
+    impl crate::net::Provider for RefusingProvider {
+        fn network(&self) -> Network {
+            Network::X
+        }
+        fn caps(&self) -> Caps {
+            Network::X.caps()
+        }
+        fn signed_in(&self) -> bool {
+            true
+        }
+        fn account(&self) -> Option<crate::model::User> {
+            None
+        }
+        fn me(&mut self) -> Result<crate::model::User, NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn feed(
+            &mut self,
+            _: crate::net::FeedKind,
+            _: Option<&str>,
+            _: u8,
+        ) -> Result<crate::model::Page, NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn mentions(&mut self, _: Option<&str>, _: u8) -> Result<crate::model::Page, NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn thread(&mut self, _: &str, _: u8) -> Result<crate::model::Page, NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn user(
+            &mut self,
+            _: &str,
+            _: Option<&str>,
+            _: u8,
+        ) -> Result<(crate::model::User, crate::model::Page), NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn search(
+            &mut self,
+            _: &str,
+            _: Option<&str>,
+            _: u8,
+        ) -> Result<crate::model::Page, NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn post(&mut self, _: &net::Draft) -> Result<Post, NetError> {
+            Err(self.0.take().expect("one write per test"))
+        }
+        fn delete(&mut self, _: &str) -> Result<(), NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn set_like(&mut self, _: &str, _: bool) -> Result<(), NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn set_repost(&mut self, _: &str, _: bool) -> Result<(), NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn set_bookmark(&mut self, _: &str, _: bool) -> Result<(), NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+        fn set_follow(&mut self, _: &str, _: bool) -> Result<(), NetError> {
+            Err(NetError::Other("unused".into()))
+        }
+    }
+
     fn done(what: &str) -> Done {
         Done {
             id: Some("x:1".into()),
@@ -646,6 +759,66 @@ mod tests {
         assert!(delivery.failed().is_empty());
         assert!(drafts::load_from(&store).unwrap().is_empty());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_uncertain_send_keeps_the_draft_warning_but_a_rejection_clears_it() {
+        let dir = temp("uncertain");
+        let store = dir.join("drafts.json");
+        for (error, uncertain) in [
+            (
+                NetError::OutcomeUnknown {
+                    net: Network::X,
+                    message: "connection closed after sending".into(),
+                },
+                true,
+            ),
+            (
+                NetError::Http {
+                    net: Network::X,
+                    status: 403,
+                    message: "permission denied".into(),
+                },
+                false,
+            ),
+        ] {
+            let mut clients = Clients::empty();
+            clients.stub(RefusingProvider(Some(error)));
+            let mut state =
+                State::boot(false, 15, &Config::default(), &clients, Some(&[Network::X]));
+            let delivery = send_intent(
+                &mut state,
+                &mut clients,
+                &intent("keep my text", &[Network::X]),
+                &store,
+                TUI_HINT,
+            )
+            .unwrap();
+            assert_eq!(delivery.failed(), [Network::X]);
+            assert_eq!(delivery.kept, Ok(()));
+            let kept = drafts::load_from(&store)
+                .unwrap()
+                .into_iter()
+                .find(|draft| draft.id == delivery.id)
+                .unwrap();
+            assert_eq!(kept.text, "keep my text");
+            assert_eq!(kept.targets, ["x"]);
+            assert_eq!(kept.sending_status().is_some(), uncertain);
+            assert_eq!(kept.sending == ["x"], uncertain);
+            assert!(state.posts.is_empty());
+            let preview = Intent {
+                draft_id: Some(delivery.id.clone()),
+                ..intent("keep my text", &[Network::X])
+            };
+            keep(&state, &preview, &store).unwrap();
+            let kept = drafts::load_from(&store)
+                .unwrap()
+                .into_iter()
+                .find(|draft| draft.id == delivery.id)
+                .unwrap();
+            assert_eq!(kept.sending_status().is_some(), uncertain);
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

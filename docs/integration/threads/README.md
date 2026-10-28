@@ -1,5 +1,7 @@
 # Threads
 
+The product currently refuses live Threads with `Waiting for Meta approval` and does not call Meta. `--demo` still includes Threads and never calls the network. The rest of this page is the client for when that hold is removed.
+
 SoCLI reaches Threads through Meta's Threads API (`https://graph.threads.com/v1.0`). The API is narrower than the app: it has no home timeline, no likes, no follows and no view of other people's profiles, so SoCLI on Threads is a place to read your own threads, mentions, conversations and keyword search, and to post, reply, quote, repost and delete. This page lists what works, which limits the code and the official documentation state, what is not built, and where the other four pages for this network live.
 
 Part of the [integration overview](../README.md). The other pages: [auth](auth.md), [endpoints](endpoints.md), [mapping](mapping.md), [testing](testing.md).

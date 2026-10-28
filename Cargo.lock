@@ -2147,7 +2147,7 @@ dependencies = [
 
 [[package]]
 name = "socli"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "aes",
  "base64 0.22.1",

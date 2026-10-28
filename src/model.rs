@@ -212,7 +212,7 @@ impl Section {
         let all = [Section::Home, Section::Notifications, Section::Search];
         let i = all.iter().position(|s| *s == self).unwrap_or(0) as i32;
         let n = all.len() as i32;
-        all[((i + dir).rem_euclid(n)) as usize]
+        all[((i + dir.rem_euclid(n)) % n) as usize]
     }
 }
 
@@ -285,6 +285,18 @@ pub struct Feed {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn section_cycle_accepts_the_full_direction_range() {
+        for section in [Section::Home, Section::Notifications, Section::Search] {
+            for direction in [i32::MIN, -3, -1, 0, 1, 3, i32::MAX] {
+                assert_eq!(
+                    section.cycle(direction),
+                    section.cycle(direction.rem_euclid(3))
+                );
+            }
+        }
+    }
 
     #[test]
     fn post_json_lists_link_images() {

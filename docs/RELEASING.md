@@ -8,8 +8,8 @@ Every release builds the following targets. Linux builds use musl so the distrib
 
 | Platform | Rust target | Packages |
 | --- | --- | --- |
-| macOS Intel | `x86_64-apple-darwin` | `.tar.gz` |
-| macOS Apple Silicon | `aarch64-apple-darwin` | `.tar.gz` |
+| macOS Intel | `x86_64-apple-darwin` | `.tar.gz`, `.dmg` |
+| macOS Apple Silicon | `aarch64-apple-darwin` | `.tar.gz`, `.dmg` |
 | Linux ARMv7 | `armv7-unknown-linux-musleabihf` | `.tar.gz`, `.deb`, `.rpm`, `.apk` |
 | Linux ARM64 | `aarch64-unknown-linux-musl` | `.tar.gz`, `.deb`, `.rpm`, `.apk` |
 | Linux x86 | `i686-unknown-linux-musl` | `.tar.gz`, `.deb`, `.rpm`, `.apk` |
@@ -18,7 +18,9 @@ Every release builds the following targets. Linux builds use musl so the distrib
 
 The Windows targets `i686-pc-windows-msvc` and `x86_64-pc-windows-msvc` remain commented out in the matrix. Enabling them also requires adapting packaging and validating authentication and terminal behavior on Windows.
 
-The GitHub release includes every package, `socli.rb`, the source-build candidate `socli-core.rb`, a source archive, and `SHA256SUMS`. Native archives contain the executable, README, changelog, license, and third-party notices. Linux packages install the executable under `/usr/bin` and include the license and notices. nFPM translates the matrix architecture into each package format's architecture name. Both macOS builds target macOS 12 or newer and include the embedded Swift authentication helper.
+`website/public/install.sh` is served at `https://socli.sh/install.sh`. It selects these package names for the machine, verifies `SHA256SUMS`, and installs. Arch and Omarchy receive the musl archive. The site worker allows `/install.sh` as a static asset.
+
+The GitHub release includes every package, `socli.rb`, the source-build candidate `socli-core.rb`, a source archive, and `SHA256SUMS`. The release is rejected when any of those packages is missing, including both macOS disk images, the four Debian packages, the RPM and Alpine packages, both npm archives, and the Homebrew formula. Required artifacts must be nonempty regular files, and npm package-name overrides apply to the completeness check. Native archives contain the executable, README, changelog, license, and third-party notices. Linux packages install the executable under `/usr/bin` and include the license and notices. nFPM translates the matrix architecture into each package format's architecture name. Both macOS builds target macOS 12 or newer and include the embedded Swift authentication helper. Each disk image contains `socli.pkg`, which installs `socli` into `/usr/local/bin`. The package is not notarized.
 
 The native npm package is `soclish`. It exposes the `socli` command, so both `npx soclish@latest --demo` and `bunx soclish@latest --demo` run the native reader after publication. A global npm installation also installs `socli` on your command path. The [CLI package README](../packages/cli/README.md) covers installation and supported platforms.
 
@@ -82,7 +84,7 @@ Homebrew Core accepts source builds, so releases also contain `socli-core.rb` an
 
 Core submission is pending eligibility under the [package acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy). A repository under 30 days old is normally ineligible. Owner submissions normally require at least 90 forks, 90 watchers, or 225 stars. The project had none of those on 2026-10-25. Acceptance remains a maintainer decision. Homebrew's [contribution instructions](https://docs.brew.sh/How-To-Open-a-Homebrew-Pull-Request) also require the contributor to review AI-assisted work, disclose that assistance, and answer review questions personally.
 
-Debian, RPM, and Alpine packages are published as GitHub release assets. Users can download a newer package and install it through their package manager. Automatic `apt upgrade`, `dnf upgrade`, and `apk upgrade` discovery requires a separately hosted and signed repository with package indexes and signing keys. This repository does not configure such a service. Distribution-maintained packages and Homebrew Core also have their own review and update processes; the workflow updates your tap.
+Debian, RPM, and Alpine packages are published as GitHub release assets. A person downloads the file for that machine and installs it with `apt`, `dnf`, or `apk`. There is no public archive that accepts a project release and then serves it to every `apt upgrade`, `dnf upgrade`, and `apk upgrade` with no further setup. Debian, Fedora, and Alpine only upgrade packages that are already in their own archives, and a release tag cannot upload into those archives. A third-party repository can track later versions after its source is added once. This repository does not configure one. Distribution-maintained packages and Homebrew Core also have their own review and update processes; the workflow updates your tap.
 
 ## Why this workflow
 

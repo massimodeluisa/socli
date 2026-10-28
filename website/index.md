@@ -15,7 +15,7 @@ description: Cross-platform TUI social media client for X, Bluesky, dev/null, Th
 
 <InstallCommand />
 
-<p class="meta"><span>0.1.2</span> <a href="https://github.com/massimodeluisa/socli/blob/main/LICENSE">MIT</a> <span><code>npx soclish --demo</code> needs no account</span></p>
+<p class="meta"><span>0.1.3</span> <a href="https://github.com/massimodeluisa/socli/blob/main/LICENSE">MIT</a> <span><code>npx soclish --demo</code> needs no account</span></p>
 
 <nav class="nets" aria-label="Networks">
   <a href="docs/networks.html#x">X</a>
@@ -74,7 +74,7 @@ Follow conversations on thread rails, expand folded replies and open an author's
 
 <h2><a href="docs/reader.html#detail-levels">Terminal appearance and images</a></h2>
 
-Choose themes, spacing and four detail levels, from plain text to inline pictures and link previews. View images in the terminal with kitty, iTerm2 or sixel graphics, with half blocks as the fallback.
+Choose themes, spacing and four detail levels, from plain text to inline pictures and link previews. Run SoCLI in [Ghostty](https://ghostty.org/docs/install/binary) instead of Terminal.app so those pictures render. Install Ghostty from its [official installation page](https://ghostty.org/docs/install/binary). Terminal.app draws half blocks.
 
 </section>
 
@@ -90,7 +90,7 @@ Pipe feeds and command results to other tools with `--json`. Coding agents get J
 
 <h2><a href="docs/web.html">WebAssembly in the browser</a></h2>
 
-The reader on this page is the SoCLI program, compiled to WebAssembly, with the same keys and layout. It opens the welcome screen until this site has an account. Bluesky, Mastodon, Threads and X sign in and read here. X and Threads open an approval page when this build includes SoCLI's app id. A build without that id says so. X on the page uses the official API, so For you is a search, and likes and follows can be refused. The local docs server forwards only `api.x.com` for the X token exchange, and a static host such as GitHub Pages does not. Threads sends the approval code to `https://socli.sh/threads/token`, which holds the app secret. The Threads app is published. dev/null signs in on the page: it opens the approval on dev-null.sh, and you paste the `devnull://` callback. GitHub SSH signing stays in the terminal. `socli login x` in a terminal still imports the browser session. The page keeps its config, tokens included, in this origin's local storage. Rich mode draws profile pictures and post images on the page, including a signed-in timeline, by loading each image from its URL. `ui.images` set to `off` keeps the image card. kitty, iTerm2 and sixel stay in the terminal. The buttons above the reader set a mobile, tablet, or desktop window, and full screen opens a page that is only the reader.
+The reader on this page is the SoCLI program, compiled to WebAssembly, with the same keys and layout. It opens the welcome screen until this site has an account. Bluesky, Mastodon and X sign in and read here. Threads answers Waiting for Meta approval and does not open a browser or call Meta. That hold is outside `--demo`. X opens an approval page when this build includes SoCLI's app id. A build without that id says so. X on the page uses the official API, so For you is a search, and likes and follows can be refused. The local docs server forwards only `api.x.com` for the X token exchange, and a static host such as GitHub Pages does not. The exchange at `https://socli.sh/threads/token` stays unused while that hold is on. dev/null signs in on the page: it opens the approval on dev-null.sh, and you paste the `devnull://` callback. GitHub SSH signing stays in the terminal. `socli login x` in a terminal still imports the browser session. The page keeps its config, tokens included, in this origin's local storage. Rich mode draws profile pictures and post images on the page, including a signed-in timeline, by loading each image from its URL. `ui.images` set to `off` keeps the image card. kitty, iTerm2 and sixel stay in the terminal. The buttons above the reader set a mobile, tablet, or desktop window, and full screen opens a page that is only the reader.
 
 </section>
 

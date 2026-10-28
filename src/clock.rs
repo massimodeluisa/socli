@@ -31,7 +31,23 @@ impl Add<Duration> for Instant {
     type Output = Self;
 
     fn add(self, rhs: Duration) -> Self {
-        Self(self.0.saturating_add(rhs.as_millis() as u64))
+        let millis = u64::try_from(rhs.as_millis()).unwrap_or(u64::MAX);
+        Self(self.0.saturating_add(millis))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deadlines_saturate_before_narrowing_large_durations() {
+        assert_eq!(Instant(7) + Duration::MAX, Instant(u64::MAX));
+        assert_eq!(
+            Instant(u64::MAX) + Duration::from_millis(1),
+            Instant(u64::MAX)
+        );
+        assert_eq!(Instant(7) + Duration::from_millis(3), Instant(10));
     }
 }
 

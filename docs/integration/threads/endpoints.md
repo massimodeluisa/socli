@@ -1,5 +1,7 @@
 # Threads endpoints
 
+The product currently refuses live Threads with `Waiting for Meta approval` and does not call these endpoints. The tables below are the calls for when that hold is removed.
+
 SoCLI calls the Threads API at `https://graph.threads.com/v1.0`, plus three token endpoints on `https://graph.threads.com`. The code is in `src/net/threads/mod.rs` and `src/net/threads/auth.rs`. The token goes in an `access_token` query or form parameter on every call, and SoCLI keeps the request URL out of every error message so the token never shows up in output.
 
 Back to [Threads](README.md). Related: [auth](auth.md), [mapping](mapping.md), [testing](testing.md).

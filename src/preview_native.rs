@@ -1,10 +1,11 @@
 //! Inline images for the rich detail level: background download and decode, drawn as kitty, iTerm2, sixel or half blocks through ratatui-image.
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::mpsc::{channel, sync_channel, Receiver, Sender, SyncSender, TrySendError};
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use image::imageops::FilterType;
 use image::{DynamicImage, Rgba, RgbaImage};
@@ -16,7 +17,13 @@ use ratatui_image::{Resize, ResizeEncodeRender};
 
 const WORKERS: usize = 3;
 const MAX_READY: usize = 64;
+const MAX_PENDING: usize = 64;
+const MAX_OUTSTANDING: usize = MAX_PENDING + WORKERS;
+const MAX_ENTRIES: usize = MAX_READY + MAX_OUTSTANDING;
+const RETRY_QUEUE: Duration = Duration::from_secs(1);
+const RETRY_MAX: Duration = Duration::from_secs(30);
 const MAX_VARIANTS: usize = 2;
+const MAX_ENCODER: usize = MAX_READY * MAX_VARIANTS;
 const SCALE: Resize = Resize::Scale(None);
 
 /// Numbers every encoder request, so an answer for a slot that has moved on is dropped.
@@ -67,7 +74,12 @@ struct Loaded {
     avatar: Option<Avatar>,
 }
 
-type Decoded = (String, Result<Loaded, String>);
+enum Failure {
+    Fetch,
+    Decode,
+}
+
+type Decoded = (String, Result<Loaded, Failure>);
 
 /// A URL and the slot size, in cells, it is drawn at.
 type Key = (String, u16, u16);
@@ -88,17 +100,77 @@ enum Job {
     },
 }
 
+struct EncoderPermit(Arc<AtomicUsize>);
+
+impl Drop for EncoderPermit {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+struct PendingJob {
+    job: Job,
+    permit: EncoderPermit,
+}
+
+#[derive(Clone)]
+struct EncoderSender {
+    jobs: SyncSender<PendingJob>,
+    outstanding: Arc<AtomicUsize>,
+}
+
+impl EncoderSender {
+    fn try_send(&self, job: Job) -> Result<(), Job> {
+        let mut used = self.outstanding.load(Ordering::Relaxed);
+        let mut reserved = false;
+        for _ in 0..MAX_ENCODER {
+            if used >= MAX_ENCODER {
+                return Err(job);
+            }
+            match self.outstanding.compare_exchange_weak(
+                used,
+                used + 1,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    reserved = true;
+                    break;
+                }
+                Err(current) => used = current,
+            }
+        }
+        if !reserved {
+            return Err(job);
+        }
+        let pending = PendingJob {
+            job,
+            permit: EncoderPermit(Arc::clone(&self.outstanding)),
+        };
+        match self.jobs.try_send(pending) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(pending) | TrySendError::Disconnected(pending)) => {
+                let PendingJob { job, permit } = pending;
+                drop(permit);
+                Err(job)
+            }
+        }
+    }
+}
+
 /// The encoder thread's answer to one [`Job`].
 struct Done {
     key: Key,
     gen: u64,
     result: Result<StatefulProtocol, ()>,
+    _permit: EncoderPermit,
 }
 
 /** A picture at one slot size. Like ratatui-image's `ThreadProtocol`, it hands its protocol to the encoder thread when a resize is due, but answers come back by key. */
 pub struct KeyedProtocol {
     inner: Option<StatefulProtocol>,
-    tx: Sender<Job>,
+    tx: EncoderSender,
+    pending: bool,
     key: Key,
     gen: u64,
 }
@@ -121,13 +193,17 @@ impl ResizeEncodeRender for KeyedProtocol {
     fn resize_encode(&mut self, resize: &Resize, area: Rect) {
         if let Some(protocol) = self.inner.take() {
             self.gen = next_generation();
-            let _ = self.tx.send(Job::Encode {
+            match self.tx.try_send(Job::Encode {
                 key: self.key.clone(),
                 gen: self.gen,
                 protocol: Box::new(protocol),
                 resize: resize.clone(),
                 area,
-            });
+            }) {
+                Ok(()) => self.pending = true,
+                Err(Job::Encode { protocol, .. }) => self.inner = Some(*protocol),
+                Err(Job::Build { .. }) => {}
+            }
         }
     }
 
@@ -149,8 +225,19 @@ struct Variant {
 }
 
 enum Entry {
-    Loading,
-    Failed,
+    Loading {
+        attempts: u8,
+        requested: u64,
+    },
+    Waiting {
+        attempts: u8,
+        retry_at: Instant,
+        requested: u64,
+        used: u64,
+    },
+    Failed {
+        used: u64,
+    },
     Ready {
         source: Arc<DynamicImage>,
         /// The download worker's protocol, until the first slot that draws the picture claims it.
@@ -161,9 +248,24 @@ enum Entry {
     },
 }
 
+impl Entry {
+    fn used(&self) -> Option<u64> {
+        match self {
+            Self::Loading { .. } => None,
+            Self::Waiting { used, .. } | Self::Failed { used } | Self::Ready { used, .. } => {
+                Some(*used)
+            }
+        }
+    }
+}
+
+fn retry_delay(attempts: u8) -> Duration {
+    Duration::from_secs(1 << attempts.saturating_sub(1).min(5)).min(RETRY_MAX)
+}
+
 /// The encoder thread's ends of its two channels.
 struct Encoder {
-    jobs: Receiver<Job>,
+    jobs: Receiver<PendingJob>,
     done: Sender<Done>,
 }
 
@@ -188,7 +290,7 @@ pub struct Previews {
     picker: Picker,
     queue: Arc<Queue>,
     results: Receiver<Decoded>,
-    encoder: Sender<Job>,
+    encoder: EncoderSender,
     encoded: Receiver<Done>,
     entries: HashMap<String, Entry>,
     /// URLs asked for as profile pictures, masked when they arrive; true for a rounded square.
@@ -279,7 +381,11 @@ impl Previews {
             let picker = picker.clone();
             thread::spawn(move || work(&queue, &fetch, &picker, &sender));
         }
-        let (encoder, jobs) = channel();
+        let (jobs_sender, jobs) = sync_channel(MAX_ENCODER);
+        let encoder = EncoderSender {
+            jobs: jobs_sender,
+            outstanding: Arc::new(AtomicUsize::new(0)),
+        };
         let (done, encoded) = channel();
         let previews = Self {
             picker,
@@ -337,26 +443,72 @@ impl Previews {
     pub fn busy(&self) -> bool {
         self.entries
             .values()
-            .any(|entry| matches!(entry, Entry::Loading))
+            .any(|entry| matches!(entry, Entry::Loading { .. }))
     }
 
-    /// Queues `url` unless it is already loading, ready or failed.
+    /// Queues `url`, retrying transient failures with backoff while it remains in the viewport.
     pub fn request(&mut self, url: &str) {
-        if self.entries.contains_key(url) {
-            return;
-        }
-        self.entries.insert(url.to_string(), Entry::Loading);
-        let job = Download {
-            url: url.to_string(),
-            avatar: self.avatar(url),
+        self.request_at(url, Instant::now());
+    }
+
+    fn request_at(&mut self, url: &str, now: Instant) {
+        self.clock = self.clock.saturating_add(1);
+        let attempts = match self.entries.get_mut(url) {
+            Some(Entry::Loading { requested, .. }) => {
+                *requested = self.frame;
+                return;
+            }
+            Some(Entry::Waiting {
+                attempts,
+                retry_at,
+                requested,
+                used,
+            }) => {
+                *requested = self.frame;
+                *used = self.clock;
+                if now < *retry_at {
+                    return;
+                }
+                *attempts
+            }
+            Some(Entry::Ready { used, .. } | Entry::Failed { used }) => {
+                *used = self.clock;
+                return;
+            }
+            None => 0,
         };
+        let avatar = self.avatar(url);
+        let outstanding = self
+            .entries
+            .values()
+            .filter(|entry| matches!(entry, Entry::Loading { .. }))
+            .count();
         let mut jobs = self
             .queue
             .jobs
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
-        jobs.push_back(job);
-        self.queue.wake.notify_one();
+        let entry = if jobs.len() < MAX_PENDING && outstanding < MAX_OUTSTANDING {
+            jobs.push_back(Download {
+                url: url.to_string(),
+                avatar,
+            });
+            self.queue.wake.notify_one();
+            Entry::Loading {
+                attempts,
+                requested: self.frame,
+            }
+        } else {
+            Entry::Waiting {
+                attempts,
+                retry_at: now + RETRY_QUEUE,
+                requested: self.frame,
+                used: self.clock,
+            }
+        };
+        drop(jobs);
+        self.entries.insert(url.to_string(), entry);
+        self.evict();
     }
 
     /// The cut `url` gets as a profile picture: the largest square in a 5×3 cell box.
@@ -373,12 +525,26 @@ impl Previews {
 
     /// Collects finished downloads and encodes without blocking; true when anything changed.
     pub fn poll(&mut self) -> bool {
+        self.poll_at(Instant::now())
+    }
+
+    fn poll_at(&mut self, now: Instant) -> bool {
         let mut changed = false;
         while let Ok((url, result)) = self.results.try_recv() {
+            let Some(Entry::Loading {
+                attempts,
+                requested,
+            }) = self.entries.get(&url)
+            else {
+                continue;
+            };
+            let (attempts, requested) = (*attempts, *requested);
             changed = true;
+            self.clock = self.clock.saturating_add(1);
             let entry = match result {
                 Ok(loaded) if loaded.avatar != self.avatar(&url) => {
                     self.entries.remove(&url);
+                    self.avatars.remove(&url);
                     continue;
                 }
                 Ok(loaded) => {
@@ -391,12 +557,22 @@ impl Previews {
                         size: loaded.size,
                     }
                 }
-                Err(_) => Entry::Failed,
+                Err(Failure::Fetch) => {
+                    let attempts = attempts.saturating_add(1);
+                    Entry::Waiting {
+                        attempts,
+                        retry_at: now + retry_delay(attempts),
+                        requested,
+                        used: self.clock,
+                    }
+                }
+                Err(Failure::Decode) => Entry::Failed { used: self.clock },
             };
             self.entries.insert(url, entry);
             self.evict();
         }
         while let Ok(done) = self.encoded.try_recv() {
+            changed = true;
             let Some(Entry::Ready { variants, .. }) = self.entries.get_mut(&done.key.0) else {
                 continue;
             };
@@ -405,13 +581,33 @@ impl Previews {
             }) else {
                 continue;
             };
-            changed = true;
             match done.result {
-                Ok(protocol) => variant.protocol.inner = Some(protocol),
+                Ok(protocol) => {
+                    variant.protocol.inner = Some(protocol);
+                    variant.protocol.pending = false;
+                }
                 Err(()) => {
-                    self.entries.insert(done.key.0, Entry::Failed);
+                    self.clock = self.clock.saturating_add(1);
+                    self.entries
+                        .insert(done.key.0, Entry::Failed { used: self.clock });
                 }
             }
+        }
+        let due: Vec<String> = self
+            .entries
+            .iter()
+            .filter_map(|(url, entry)| match entry {
+                Entry::Waiting {
+                    retry_at,
+                    requested,
+                    ..
+                } if *requested == self.frame && *retry_at <= now => Some(url.clone()),
+                _ => None,
+            })
+            .collect();
+        for url in due {
+            self.request_at(&url, now);
+            changed = true;
         }
         changed
     }
@@ -459,6 +655,7 @@ impl Previews {
                 let mut protocol = KeyedProtocol {
                     inner: unclaimed.take().map(|protocol| *protocol),
                     tx: self.encoder.clone(),
+                    pending: false,
                     key,
                     gen: next_generation(),
                 };
@@ -475,6 +672,7 @@ impl Previews {
                 let (index, oldest) = variants
                     .iter_mut()
                     .enumerate()
+                    .filter(|(_, variant)| !variant.protocol.pending)
                     .min_by_key(|(_, variant)| variant.drawn)?;
                 if oldest.drawn == self.frame {
                     return None;
@@ -490,6 +688,9 @@ impl Previews {
         let variant = &mut variants[index];
         variant.drawn = self.frame;
         let protocol = &mut variant.protocol;
+        if protocol.inner.is_none() && !protocol.pending {
+            build(protocol, source);
+        }
         let fill = protocol.size_for(SCALE, area)?;
         if let Some(rect) = protocol.needs_resize(&SCALE, fill) {
             protocol.resize_encode(&SCALE, rect);
@@ -502,8 +703,8 @@ impl Previews {
     pub fn shown(&self, url: &str) -> Shown {
         match self.entries.get(url) {
             None => Shown::Missing,
-            Some(Entry::Loading) => Shown::Loading,
-            Some(Entry::Failed) => Shown::Failed,
+            Some(Entry::Loading { .. } | Entry::Waiting { .. }) => Shown::Loading,
+            Some(Entry::Failed { .. }) => Shown::Failed,
             Some(Entry::Ready { .. }) => Shown::Ready,
         }
     }
@@ -527,25 +728,37 @@ impl Previews {
     }
 
     fn evict(&mut self) {
-        let ready = self
+        while self
             .entries
             .values()
             .filter(|entry| matches!(entry, Entry::Ready { .. }))
-            .count();
-        if ready <= MAX_READY {
-            return;
+            .count()
+            > MAX_READY
+        {
+            let oldest = self
+                .entries
+                .iter()
+                .filter_map(|(url, entry)| match entry {
+                    Entry::Ready { used, .. } => Some((*used, url.clone())),
+                    _ => None,
+                })
+                .min();
+            if let Some((_, url)) = oldest {
+                self.entries.remove(&url);
+            }
         }
-        let oldest = self
-            .entries
-            .iter()
-            .filter_map(|(url, entry)| match entry {
-                Entry::Ready { used, .. } => Some((*used, url.clone())),
-                _ => None,
-            })
-            .min();
-        if let Some((_, url)) = oldest {
+        while self.entries.len() > MAX_ENTRIES {
+            let oldest = self
+                .entries
+                .iter()
+                .filter_map(|(url, entry)| entry.used().map(|used| (used, url.clone())))
+                .min();
+            let Some((_, url)) = oldest else {
+                break;
+            };
             self.entries.remove(&url);
         }
+        self.avatars.retain(|url, _| self.entries.contains_key(url));
     }
 }
 
@@ -639,15 +852,19 @@ fn shaped(
 
 /// Asks the encoder thread for a new protocol at `protocol`'s slot size, built from the prepared picture.
 fn build(protocol: &mut KeyedProtocol, source: &Arc<DynamicImage>) {
-    let _ = protocol.tx.send(Job::Build {
-        key: protocol.key.clone(),
-        gen: protocol.gen,
-        source: Arc::clone(source),
-    });
+    protocol.pending = protocol
+        .tx
+        .try_send(Job::Build {
+            key: protocol.key.clone(),
+            gen: protocol.gen,
+            source: Arc::clone(source),
+        })
+        .is_ok();
 }
 
 /** Resizes and encodes off the reader's thread; a built protocol is encoded for the area the slot will ask for. */
-fn encode(picker: &Picker, job: Job) -> Done {
+fn encode(picker: &Picker, pending: PendingJob) -> Done {
+    let PendingJob { job, permit } = pending;
     let (key, gen, mut protocol, resize, area) = match job {
         Job::Encode {
             key,
@@ -668,12 +885,23 @@ fn encode(picker: &Picker, job: Job) -> Done {
         Some(Ok(())) => Ok(protocol),
         _ => Err(()),
     };
-    Done { key, gen, result }
+    Done {
+        key,
+        gen,
+        result,
+        _permit: permit,
+    }
 }
 
 impl Drop for Previews {
     fn drop(&mut self) {
+        let mut jobs = self
+            .queue
+            .jobs
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
         self.queue.closed.store(true, Ordering::SeqCst);
+        jobs.clear();
         self.queue.wake.notify_all();
     }
 }
@@ -716,7 +944,8 @@ fn work(queue: &Queue, fetch: &Fetch, picker: &Picker, sender: &Sender<Decoded>)
             }
         };
         let result = fetch(&job.url)
-            .and_then(|bytes| crate::media::decode(&bytes))
+            .map_err(|_| Failure::Fetch)
+            .and_then(|bytes| crate::media::decode(&bytes).map_err(|_| Failure::Decode))
             .map(|image| {
                 let image = match job.avatar {
                     Some(avatar) => fill_box(image, avatar),
@@ -908,6 +1137,39 @@ mod tests {
     }
 
     #[test]
+    fn dropping_previews_closes_and_empties_pending_downloads() {
+        let started = Arc::new(std::sync::Barrier::new(WORKERS + 1));
+        let release = Arc::new(std::sync::Barrier::new(WORKERS + 1));
+        let fetch: Fetch = {
+            let started = Arc::clone(&started);
+            let release = Arc::clone(&release);
+            Arc::new(move |_| {
+                started.wait();
+                release.wait();
+                Err("offline".into())
+            })
+        };
+        let mut previews = previews(fetch);
+        for index in 0..WORKERS {
+            previews.request(&format!("https://example.com/active-{index}.png"));
+        }
+        started.wait();
+        previews.request("https://example.com/pending.png");
+        let queue = Arc::clone(&previews.queue);
+        drop(previews);
+        let closed = queue.closed.load(Ordering::SeqCst);
+        let empty = queue.jobs.lock().expect("queue lock").is_empty();
+        release.wait();
+        assert!(closed);
+        assert!(empty);
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Arc::strong_count(&queue) > 1 {
+            assert!(Instant::now() < deadline, "download workers stayed alive");
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
     fn decoded_image_becomes_ready() {
         let mut p = previews(ok_fetch());
         assert_eq!(p.shown("a"), Shown::Missing);
@@ -992,11 +1254,274 @@ mod tests {
     }
 
     #[test]
-    fn failing_fetch_becomes_failed() {
-        let mut p = previews(Arc::new(|_| Err("offline".to_string())));
+    fn completed_encoder_results_hold_capacity_until_polled() {
+        let picker = Picker::halfblocks();
+        let (mut p, encoder) = Previews::unstarted(picker.clone(), ok_fetch());
+        let source = Arc::new(DynamicImage::ImageRgba8(RgbaImage::new(4, 2)));
+        for index in 0..MAX_ENCODER {
+            assert!(p
+                .encoder
+                .try_send(Job::Build {
+                    key: (format!("old-{index}"), 8, 4),
+                    gen: index as u64,
+                    source: Arc::clone(&source),
+                })
+                .is_ok());
+            let pending = encoder.jobs.try_recv().expect("queued encode");
+            assert!(encoder.done.send(encode(&picker, pending)).is_ok());
+        }
+        assert_eq!(p.encoder.outstanding.load(Ordering::Relaxed), MAX_ENCODER);
+        let rejected = p.encoder.try_send(Job::Build {
+            key: ("deferred".into(), 8, 4),
+            gen: 0,
+            source: Arc::clone(&source),
+        });
+        assert!(matches!(rejected, Err(Job::Build { .. })));
+        p.poll();
+        assert_eq!(p.encoder.outstanding.load(Ordering::Relaxed), 0);
+        assert!(p
+            .encoder
+            .try_send(Job::Build {
+                key: ("retry".into(), 8, 4),
+                gen: 1,
+                source,
+            })
+            .is_ok());
+    }
+
+    #[test]
+    fn a_rejected_resize_keeps_its_protocol_for_the_next_draw() {
+        let picker = Picker::halfblocks();
+        let (p, encoder) = Previews::unstarted(picker.clone(), ok_fetch());
+        let image = DynamicImage::ImageRgba8(RgbaImage::new(4, 2));
+        let source = Arc::new(image.clone());
+        for index in 0..MAX_ENCODER {
+            assert!(p
+                .encoder
+                .try_send(Job::Build {
+                    key: (format!("queued-{index}"), 8, 4),
+                    gen: index as u64,
+                    source: Arc::clone(&source),
+                })
+                .is_ok());
+        }
+        let mut protocol = KeyedProtocol {
+            inner: Some(picker.new_resize_protocol(image)),
+            tx: p.encoder.clone(),
+            pending: false,
+            key: ("current".into(), 8, 4),
+            gen: 0,
+        };
+        protocol.resize_encode(&SCALE, AREA);
+        assert!(protocol.inner.is_some());
+        assert!(!protocol.pending);
+        drop(encoder.jobs.try_recv().expect("free one permit"));
+        protocol.resize_encode(&SCALE, AREA);
+        assert!(protocol.inner.is_none());
+        assert!(protocol.pending);
+        assert_eq!(p.encoder.outstanding.load(Ordering::Relaxed), MAX_ENCODER);
+    }
+
+    #[test]
+    fn rapid_resize_does_not_replace_inflight_image_variants() {
+        let picker = Picker::halfblocks();
+        let (mut p, _encoder) = Previews::unstarted(picker, ok_fetch());
         p.request("a");
-        wait_for(&mut p, "a", Shown::Failed);
-        assert!(p.encoded("a", AREA).is_none());
+        wait_for(&mut p, "a", Shown::Ready);
+        p.next_frame();
+        assert!(p.encoded("a", Rect::new(0, 0, 6, 3)).is_none());
+        p.next_frame();
+        assert!(p.encoded("a", Rect::new(0, 0, 12, 6)).is_none());
+        let keys = |p: &Previews| match p.entries.get("a") {
+            Some(Entry::Ready { variants, .. }) => variants
+                .iter()
+                .map(|variant| variant.protocol.key.clone())
+                .collect::<Vec<_>>(),
+            _ => panic!("ready image"),
+        };
+        let original = keys(&p);
+        assert_eq!(p.encoder.outstanding.load(Ordering::Relaxed), MAX_VARIANTS);
+        for width in 20..120 {
+            p.next_frame();
+            assert!(p.encoded("a", Rect::new(0, 0, width, 4)).is_none());
+        }
+        assert_eq!(keys(&p), original);
+        assert_eq!(p.encoder.outstanding.load(Ordering::Relaxed), MAX_VARIANTS);
+    }
+
+    fn wait_for_retry(previews: &mut Previews, url: &str, now: Instant) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            previews.poll_at(now);
+            if matches!(
+                previews.entries.get(url),
+                Some(Entry::Waiting { attempts: 1, .. })
+            ) {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "{url} never entered retry backoff"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn an_offline_preview_recovers_without_a_new_reader() {
+        let now = Instant::now();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&calls);
+        let bytes = png();
+        let mut p = previews(Arc::new(move |_| {
+            if count.fetch_add(1, Ordering::SeqCst) == 0 {
+                Err("offline".into())
+            } else {
+                Ok(bytes.clone())
+            }
+        }));
+        p.request_at("a", now);
+        wait_for_retry(&mut p, "a", now);
+        assert_eq!(p.shown("a"), Shown::Loading);
+        assert!(!p.busy(), "backoff does not keep the spinner running");
+        p.poll_at(now + Duration::from_millis(999));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        p.poll_at(now + Duration::from_secs(1));
+        wait_for(&mut p, "a", Shown::Ready);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn offscreen_previews_wait_until_requested_again_before_retrying() {
+        let now = Instant::now();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&calls);
+        let mut p = previews(Arc::new(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            Err("offline".into())
+        }));
+        p.next_frame();
+        p.request_at("a", now);
+        wait_for_retry(&mut p, "a", now);
+        p.next_frame();
+        p.poll_at(now + RETRY_MAX);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(!p.busy());
+        p.request_at("a", now + RETRY_MAX);
+        assert!(p.busy());
+    }
+
+    #[test]
+    fn repeated_fetch_failures_have_a_capped_retry_delay() {
+        assert_eq!(retry_delay(1), Duration::from_secs(1));
+        assert_eq!(retry_delay(2), Duration::from_secs(2));
+        assert_eq!(retry_delay(5), Duration::from_secs(16));
+        assert_eq!(retry_delay(6), RETRY_MAX);
+        assert_eq!(retry_delay(u8::MAX), RETRY_MAX);
+    }
+
+    #[test]
+    fn a_full_download_queue_defers_work_and_bounds_avatar_metadata() {
+        let now = Instant::now();
+        let started = Arc::new(std::sync::Barrier::new(WORKERS + 1));
+        let release = Arc::new(std::sync::Barrier::new(WORKERS + 1));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let fetch: Fetch = {
+            let started = Arc::clone(&started);
+            let release = Arc::clone(&release);
+            let count = Arc::clone(&calls);
+            let bytes = png();
+            Arc::new(move |_| {
+                if count.fetch_add(1, Ordering::SeqCst) < WORKERS {
+                    started.wait();
+                    release.wait();
+                }
+                Ok(bytes.clone())
+            })
+        };
+        let mut p = previews(fetch);
+        for index in 0..WORKERS {
+            p.request_at(&format!("active-{index}"), now);
+        }
+        started.wait();
+        for index in 0..(MAX_PENDING + MAX_ENTRIES) {
+            p.request_avatar(&format!("queued-{index}"), false);
+        }
+        let pending = p.queue.jobs.lock().expect("queue").len();
+        let remembered = p.entries.len();
+        let avatar_count = p.avatars.len();
+        let deferred = format!("queued-{}", MAX_PENDING + MAX_ENTRIES - 1);
+        let waits = matches!(p.entries.get(&deferred), Some(Entry::Waiting { .. }));
+        release.wait();
+        assert_eq!(pending, MAX_PENDING);
+        assert!(remembered <= MAX_ENTRIES);
+        assert!(avatar_count <= MAX_ENTRIES);
+        assert!(waits);
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while p.busy() {
+            p.poll_at(now);
+            assert!(Instant::now() < deadline, "queued downloads did not finish");
+            thread::sleep(Duration::from_millis(5));
+        }
+        p.poll_at(now + RETRY_MAX);
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while p.shown(&deferred) != Shown::Ready {
+            p.poll_at(now + RETRY_MAX);
+            assert!(
+                Instant::now() < deadline,
+                "deferred downloads did not finish"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert!(p.avatars.keys().all(|url| p.entries.contains_key(url)));
+    }
+
+    #[test]
+    fn completed_downloads_count_toward_the_outstanding_bound_until_polled() {
+        let (completed, received) = std::sync::mpsc::channel();
+        let bytes = png();
+        let mut p = previews(Arc::new(move |_| {
+            completed.send(()).expect("completion observer");
+            Ok(bytes.clone())
+        }));
+        for index in 0..MAX_OUTSTANDING {
+            p.request(&format!("completed-{index}"));
+            received
+                .recv_timeout(Duration::from_secs(2))
+                .expect("worker drained the queue");
+        }
+        assert!(p.queue.jobs.lock().expect("queue").is_empty());
+        for index in 0..MAX_ENTRIES {
+            p.request_avatar(&format!("deferred-{index}"), false);
+        }
+        let outstanding = p
+            .entries
+            .values()
+            .filter(|entry| matches!(entry, Entry::Loading { .. }))
+            .count();
+        assert_eq!(outstanding, MAX_OUTSTANDING);
+        assert!(p.entries.len() <= MAX_ENTRIES);
+        assert!(p.avatars.len() <= MAX_ENTRIES);
+        assert!(p.queue.jobs.lock().expect("queue").is_empty());
+        assert!(matches!(
+            p.entries.get(&format!("deferred-{}", MAX_ENTRIES - 1)),
+            Some(Entry::Waiting { .. })
+        ));
+    }
+
+    #[test]
+    fn failed_cache_entries_release_their_avatar_metadata_on_eviction() {
+        let mut p = previews(ok_fetch());
+        for index in 0..=MAX_ENTRIES {
+            let url = format!("failed-{index}");
+            p.avatars.insert(url.clone(), false);
+            p.entries.insert(url, Entry::Failed { used: index as u64 });
+            p.evict();
+        }
+        assert_eq!(p.entries.len(), MAX_ENTRIES);
+        assert_eq!(p.avatars.len(), MAX_ENTRIES);
+        assert!(!p.entries.contains_key("failed-0"));
+        assert!(!p.avatars.contains_key("failed-0"));
     }
 
     #[test]

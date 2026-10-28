@@ -77,7 +77,7 @@ jobs:
       - run: rustup show active-toolchain
       - run: cargo fmt --check
       - run: cargo test --locked
-      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.2
@@ -86,7 +86,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - run: bun test scripts/release.test.ts scripts/soclib.test.ts
+      - run: bun test scripts/release.test.ts scripts/soclib.test.ts scripts/install.test.ts
 
   native:
     needs: [validate, test]
@@ -163,7 +163,7 @@ jobs:
         run: |
           cargo build --locked --release --bin socli --target "$TARGET"
           "target/$TARGET/release/socli" --version | grep -Fx "socli $VERSION"
-      - name: Package native build
+      - name: Package archive, Linux packages, and macOS installer
         run: bash scripts/package-native.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -173,7 +173,7 @@ jobs:
 
   web:
     needs: [validate, test]
-    uses: $/.github/workflows/pages.yml
+    uses: ./.github/workflows/pages.yml
     with:
       version: ${{ needs.validate.outputs.version }}
 
@@ -206,6 +206,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           VERSION: ${{ needs.validate.outputs.version }}
           NPM_CLI_PACKAGE_NAME: ${{ vars.NPM_CLI_PACKAGE_NAME }}
+          NPM_PACKAGE_NAME: ${{ vars.NPM_PACKAGE_NAME }}
         run: |
           bun scripts/release.ts validate "$RELEASE_TAG"
           bun scripts/release.ts npm-native artifacts release/npm-native
@@ -215,6 +216,7 @@ jobs:
           bun scripts/release.ts formula "$VERSION" "$GITHUB_REPOSITORY" artifacts
           curl --fail --location --retry 3 "https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz" --output "artifacts/socli-$VERSION-source.tar.gz"
           bun scripts/release.ts source-formula "$VERSION" "$GITHUB_REPOSITORY" "artifacts/socli-$VERSION-source.tar.gz" artifacts/socli-core.rb
+          bun scripts/release.ts require-packages "$VERSION" artifacts
           bun scripts/release.ts checksums artifacts
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -259,11 +261,28 @@ jobs:
         with:
           name: distribution
           path: artifacts
+      - name: Require Homebrew formula, disk images, and Linux packages
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          NPM_CLI_PACKAGE_NAME: ${{ vars.NPM_CLI_PACKAGE_NAME }}
+          NPM_PACKAGE_NAME: ${{ vars.NPM_PACKAGE_NAME }}
+        run: |
+          (builtin cd artifacts && sha256sum --check SHA256SUMS)
+          bun scripts/release.ts require-packages "$VERSION" artifacts
       - name: Publish bundled soclish and browser library
         env:
           NPM_TAG: ${{ needs.validate.outputs.npm_tag }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          (builtin cd artifacts && sha256sum --check SHA256SUMS)
+          if [[ -n "$NODE_AUTH_TOKEN" ]]; then
+            export NPM_CONFIG_USERCONFIG="$RUNNER_TEMP/socli.npmrc"
+            # npm expands the placeholder while publishing; the file contains no secret.
+            # shellcheck disable=SC2016
+            printf '%s\n' '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' > "$NPM_CONFIG_USERCONFIG"
+            chmod 600 "$NPM_CONFIG_USERCONFIG"
+          else
+            unset NODE_AUTH_TOKEN
+          fi
           bun scripts/publish-npm.ts artifacts
 
   homebrew:

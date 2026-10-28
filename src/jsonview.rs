@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use serde_json::Value;
 
 use crate::render::{Kind, Span, StyledLine};
+use crate::util;
 
 #[derive(Clone, Debug)]
 pub struct Node {
@@ -91,7 +92,7 @@ fn field_line(key: &str, value: &Value, depth: usize, open: bool) -> StyledLine 
         },
         Span {
             kind: Kind::Bold,
-            text: key.to_string(),
+            text: util::clean(key).replace('\n', " "),
         },
         Span {
             kind: Kind::Dim,
@@ -141,7 +142,7 @@ fn field_line(key: &str, value: &Value, depth: usize, open: bool) -> StyledLine 
 }
 
 fn escape_preview(text: &str) -> String {
-    let flat: String = text.replace('\n', "\\n");
+    let flat = util::clean(text).replace('\n', "\\n");
     if flat.chars().count() > 80 {
         let cut: String = flat.chars().take(79).collect();
         format!("{cut}…")
@@ -158,5 +159,31 @@ pub fn toggle(open: &mut HashSet<String>, node: &Node) {
         open.remove(&node.path);
     } else {
         open.insert(node.path.clone());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn network_data_cannot_put_terminal_controls_in_the_inspector() {
+        for text in crate::fixtures::CONTROL_TEXTS {
+            let value = serde_json::json!({(text): text});
+            let rows = visible(&value, &HashSet::new());
+            assert!(!rows.is_empty());
+            for (_, line) in rows {
+                let text = line.plain();
+                assert_eq!(util::clean(&text).as_ref(), text);
+                assert!(!text.chars().any(char::is_control));
+            }
+        }
+    }
+
+    #[test]
+    fn multiline_values_keep_a_visible_newline_without_splitting_a_row() {
+        let value = serde_json::json!({"text": "first\nsecond"});
+        let rows = visible(&value, &HashSet::new());
+        assert_eq!(rows[0].1.plain(), "text: \"first\\nsecond\"");
     }
 }

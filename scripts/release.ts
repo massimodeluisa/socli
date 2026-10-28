@@ -1,4 +1,4 @@
-import { appendFile, chmod, copyFile, cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, chmod, copyFile, cp, lstat, mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { basename, join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -11,8 +11,9 @@ export function releaseVersion(tag: string): { version: string; prerelease: bool
 
 export function releaseNotes(changelog: string, version: string): string {
   const sections = changelog.split(/^## /m).slice(1)
-  const section = sections.find((value) => value.startsWith(`[${version}] - `))
-  if (!section) throw new Error(`CHANGELOG.md needs a dated [${version}] section`)
+  const matching = sections.filter((value) => value.startsWith(`[${version}] - `))
+  if (matching.length !== 1) throw new Error(`CHANGELOG.md needs exactly one dated [${version}] section`)
+  const section = matching[0]
   const [heading, ...body] = section.split('\n')
   const date = heading.slice(`[${version}] - `.length).trim()
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date) {
@@ -142,8 +143,10 @@ async function webPackage(wasm: string, output: string) {
   for (const file of ['index.d.ts', 'README.md']) await copyFile(join('packages/web', file), join(output, file))
   await cp('packages/web/fonts', join(output, 'fonts'), { recursive: true })
   await writeFile(join(output, 'reader.css'), `${await readFile('packages/web/view.css', 'utf8')}\n${await readFile('packages/web/renderer.css', 'utf8')}`)
-  await Bun.build({ entrypoints: ['packages/web/index.js'], outdir: output, target: 'browser', format: 'esm', naming: 'index.js', define: { 'import.meta.env.BASE_URL': JSON.stringify('/') } })
-  await Bun.build({ entrypoints: ['website/.vitepress/theme/reader.worker.ts'], outdir: output, target: 'browser', format: 'esm', naming: 'reader.worker.js', define: { 'import.meta.env.BASE_URL': JSON.stringify('/') } })
+  for (const [entrypoint, name] of [['packages/web/index.js', 'index.js'], ['website/.vitepress/theme/reader.worker.ts', 'reader.worker.js']]) {
+    const result = await Bun.build({ entrypoints: [entrypoint], outdir: output, target: 'browser', format: 'esm', naming: name, define: { 'import.meta.env.BASE_URL': JSON.stringify('/') } })
+    if (!result.success) throw new AggregateError(result.logs, `could not bundle ${name}`)
+  }
   for (const file of ['LICENSE', 'THIRD-PARTY-NOTICES.md']) await copyFile(file, join(output, file))
 }
 
@@ -184,6 +187,49 @@ export async function nativeNpmPackages(assets: string, output: string) {
   for (const file of ['LICENSE', 'THIRD-PARTY-NOTICES.md']) await copyFile(file, join(wrapper, file))
 }
 
+export function releasePackages(version: string, cliPackageName = 'soclish', webPackageName = '@massimodeluisa/soclib'): string[] {
+  const mac = ['aarch64-apple-darwin', 'x86_64-apple-darwin']
+  const linux = [
+    'aarch64-unknown-linux-musl',
+    'armv7-unknown-linux-musleabihf',
+    'i686-unknown-linux-musl',
+    'x86_64-unknown-linux-musl',
+  ]
+  return [
+    ...mac.flatMap((target) => [`socli-${version}-${target}.tar.gz`, `socli-${version}-${target}.dmg`]),
+    ...linux.map((target) => `socli-${version}-${target}.tar.gz`),
+    `socli_${version}-1_amd64.deb`,
+    `socli_${version}-1_arm64.deb`,
+    `socli_${version}-1_armhf.deb`,
+    `socli_${version}-1_i386.deb`,
+    `socli-${version}-1.aarch64.rpm`,
+    `socli-${version}-1.armv7hl.rpm`,
+    `socli-${version}-1.i386.rpm`,
+    `socli-${version}-1.x86_64.rpm`,
+    `socli_${version}-r1_aarch64.apk`,
+    `socli_${version}-r1_armv7.apk`,
+    `socli_${version}-r1_x86.apk`,
+    `socli_${version}-r1_x86_64.apk`,
+    'socli.rb',
+    'socli-core.rb',
+    `socli-${version}-source.tar.gz`,
+    `socli-${version}-web.tar.gz`,
+    `${cliPackageName.replace(/^@/, '').replace('/', '-')}-${version}.tgz`,
+    `${webPackageName.replace(/^@/, '').replace('/', '-')}-${version}.tgz`,
+  ]
+}
+
+export async function requireReleasePackages(assets: string, version: string, cliPackageName = 'soclish', webPackageName = '@massimodeluisa/soclib') {
+  const present = new Set(await readdir(assets))
+  const names = releasePackages(version, cliPackageName, webPackageName)
+  const missing = names.filter((name) => !present.has(name))
+  if (missing.length) throw new Error(`release is missing packages:\n${missing.join('\n')}`)
+  for (const name of names) {
+    const file = await lstat(join(assets, name))
+    if (!file.isFile() || file.size === 0) throw new Error(`release package must be a nonempty regular file: ${name}`)
+  }
+}
+
 async function checksums(assets: string) {
   const files = (await readdir(assets)).filter((name) => name !== 'SHA256SUMS').sort()
   const sums = await Promise.all(files.map(async (name) => `${await digest(join(assets, name))}  ${basename(name)}`))
@@ -197,6 +243,7 @@ if (import.meta.main) {
   else if (command === 'npm-native' && args.length === 2) await nativeNpmPackages(args[0], args[1])
   else if (command === 'formula' && args.length === 3) await writeFile(join(args[2], 'socli.rb'), await homebrewFormula(args[0], args[1], args[2]))
   else if (command === 'source-formula' && args.length === 4) await writeFile(args[3], await homebrewSourceFormula(args[0], args[1], args[2]))
+  else if (command === 'require-packages' && args.length === 2) await requireReleasePackages(args[1], args[0], process.env.NPM_CLI_PACKAGE_NAME || undefined, process.env.NPM_PACKAGE_NAME || undefined)
   else if (command === 'checksums' && args.length === 1) await checksums(args[0])
-  else throw new Error('usage: release.ts validate TAG | web WASM OUT | npm-native ASSETS OUT | formula VERSION REPOSITORY ASSETS | source-formula VERSION REPOSITORY ARCHIVE OUT | checksums ASSETS')
+  else throw new Error('usage: release.ts validate TAG | web WASM OUT | npm-native ASSETS OUT | formula VERSION REPOSITORY ASSETS | source-formula VERSION REPOSITORY ARCHIVE OUT | require-packages VERSION ASSETS | checksums ASSETS')
 }

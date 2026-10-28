@@ -83,10 +83,21 @@ pub fn decode(status: u16, retry_after: Option<u64>, body: &str) -> Result<Value
     if !(200..300).contains(&status) {
         return Err(error_from_body(status, retry_after, body));
     }
-    serde_json::from_str(body).map_err(|e| NetError::Parse {
+    let value: Value = serde_json::from_str(body).map_err(|e| NetError::Parse {
         net: NET,
         message: e.to_string(),
-    })
+    })?;
+    if value.get("error").is_some() {
+        return Err(error_from_body(status, retry_after, body));
+    }
+    if value.get("success").and_then(Value::as_bool) == Some(false) {
+        return Err(NetError::Http {
+            net: NET,
+            status,
+            message: "Threads rejected the request. check the post and try again".into(),
+        });
+    }
+    Ok(value)
 }
 
 // MARK: posts
@@ -323,6 +334,16 @@ pub fn container(value: &Value) -> Container {
 mod tests {
     use super::*;
     use chrono::{Datelike, Timelike};
+
+    #[test]
+    fn a_success_status_does_not_hide_a_rejected_request() {
+        assert!(matches!(
+            decode(200, None, r#"{"error":{"code":190,"message":"expired"}}"#),
+            Err(NetError::SignInRequired(Network::Threads))
+        ));
+        assert!(decode(200, None, r#"{"success":false}"#).is_err());
+        assert!(decode(200, None, r#"{"success":true}"#).is_ok());
+    }
 
     fn fixture(text: &str) -> Value {
         serde_json::from_str(text).expect("fixture is valid json")

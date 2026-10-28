@@ -51,15 +51,17 @@ socli auth x login --client-id <id>
 | `--oauth` | Use OAuth even when a client id is already stored. A stored client id alone does not select this path. |
 | `--client-id <id>` | The app's OAuth client id. Falls back to `X_CLIENT_ID`, then the `client_id` stored in `config.toml`, then SoCLI's compiled client. Passing it selects OAuth. |
 | `--client-secret <secret>` | The app's client secret, for confidential clients. Sent as HTTP basic authentication at the token endpoint. Passing it selects OAuth. |
-| `--scopes <list>` | The OAuth scopes to ask for. Default: `tweet.read tweet.write users.read bookmark.read bookmark.write offline.access`. |
+| `--scopes <list>` | The OAuth scopes to ask for. Default: `tweet.read tweet.write users.read like.write follows.write bookmark.read bookmark.write offline.access`. |
 | `--port <n>` | The local callback port. Default `8741`. The callback URL in the developer console must use the same port. |
 
 With no `--client-id` and no stored client id, `--oauth` and "A different account on x.com" use SoCLI's compiled client. SoCLI then does the following:
 
 1. Builds the authorize URL on `https://x.com/i/oauth2/authorize` with `response_type=code`, the client id, the redirect URI, the scopes, a random `state` and the PKCE challenge, and opens it in the browser.
-2. Waits on `127.0.0.1:<port>` for the redirect (the read times out after 180 seconds), checks that `state` matches, and takes the `code`.
+2. Waits up to 180 seconds on `127.0.0.1:<port>` for the redirect, checks that `state` matches, and takes the `code`. Each connected callback has a five-second read limit and an 8 KiB request limit.
 3. Exchanges the code at `POST https://api.x.com/2/oauth2/token` with the PKCE verifier.
 4. Calls `GET /2/users/me` with the new token. When that names an account, one write stores the client id, the secret, the tokens, the expiry, and that account, and clears any browser cookies. A failed profile read leaves the previous file unchanged.
+
+Sign in again with `socli login x --oauth` if your existing OAuth session lacks `like.write` or `follows.write`. Refreshing a token does not grant new permissions.
 
 The scope `offline.access` is what makes X issue a refresh token. The official documentation says an access token without it stays valid for two hours (checked 2026-10-20), so removing it from `--scopes` means signing in again after that time.
 

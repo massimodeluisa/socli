@@ -29,11 +29,9 @@ impl XClient {
         match f(self) {
             Ok(value) => Ok(value),
             Err(ApiError::Failed { status: 401, .. })
-                if self.credentials().refresh_token.is_some() =>
+                if !self.credentials().uses_web() && self.credentials().refresh_token.is_some() =>
             {
-                let mut creds = self.credentials().clone();
-                auth::refresh(&mut creds).map_err(NetError::Other)?;
-                *self.credentials_mut() = creds;
+                auth::refresh(self.credentials_mut()).map_err(NetError::Other)?;
                 f(self).map_err(net_error)
             }
             Err(err) => Err(net_error(err)),
@@ -59,6 +57,10 @@ fn net_error(err: ApiError) -> NetError {
         ApiError::RateLimited { retry_after } => NetError::RateLimited {
             net: Network::X,
             retry_after,
+        },
+        ApiError::OutcomeUnknown(message) => NetError::OutcomeUnknown {
+            net: Network::X,
+            message,
         },
         ApiError::Other(message) => NetError::Other(message),
     }
@@ -279,6 +281,33 @@ impl Provider for XClient {
 mod tests {
     use super::*;
     use crate::net::x::auth::Credentials;
+
+    #[test]
+    fn a_rejected_browser_session_never_refreshes_stale_oauth_tokens() {
+        let mut client = XClient::new(Credentials {
+            auth_token: Some("cookie".into()),
+            ct0: Some("csrf".into()),
+            access_token: Some("stale-oauth".into()),
+            refresh_token: Some("stale-refresh".into()),
+            ..Credentials::default()
+        })
+        .unwrap();
+        let calls = std::cell::Cell::new(0);
+        let result: Result<(), NetError> = client.call(|_| {
+            calls.set(calls.get() + 1);
+            Err(ApiError::Failed {
+                status: 401,
+                detail: "expired cookie".into(),
+                hint: String::new(),
+            })
+        });
+        assert!(matches!(result, Err(NetError::Http { status: 401, .. })));
+        assert_eq!(calls.get(), 1);
+        assert_eq!(
+            client.credentials().access_token.as_deref(),
+            Some("stale-oauth")
+        );
+    }
 
     #[test]
     fn a_quote_draft_fails_before_any_request() {

@@ -1,6 +1,6 @@
 ---
 name: socli
-description: Read and write X, Bluesky, dev/null, Threads and Mastodon from the terminal with the SoCLI CLI. Use when the user asks to read a feed, a thread, mentions or search results on one of those networks, or to post, reply, quote, like, repost, bookmark, follow or delete there. Covers JSON output, scoped post ids, dry runs and the confirmation rule for public writes.
+description: Read and write X, Bluesky, dev/null, Threads and Mastodon from the terminal with the SoCLI CLI. Live Threads answers Waiting for Meta approval and does not call Meta. Use when the user asks to read a feed, a thread, mentions or search results on one of those networks, or to post, reply, quote, like, repost, bookmark, follow or delete there. Covers JSON output, scoped post ids, dry runs and the confirmation rule for public writes.
 ---
 
 # SoCLI
@@ -28,7 +28,7 @@ socli whoami                          # which networks are signed in
 socli auth status                     # configuration, secrets redacted
 ```
 
-Without `--net`, SoCLI reads every signed-in network. `--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon`, a comma list or `all`. `--count <n>` sets the posts asked for per network (15 by default). On X each post read is billed, so do not page without a reason.
+Without `--net`, SoCLI reads every signed-in network. `--net` takes `x`, `bluesky`, `devnull`, `threads`, `mastodon`, a comma list or `all`. Naming `threads` answers `Waiting for Meta approval`, and `--net all` leaves Threads out. `--count <n>` sets the posts asked for per network (15 by default). On X each post read is billed, so do not page without a reason.
 
 Useful post fields: `id`, `network`, `url`, `text`, `created_at`, `author.username`, `in_reply_to`, `conversation_id`, `metrics`, `liked`, `reposted`, `bookmarked`, `links`, `media`, `quoted`.
 
@@ -62,13 +62,14 @@ Some networks lack features: Threads has no likes and no discover feed, and repo
 
 ## Signing in
 
-You can sign in to Bluesky, Threads and Mastodon without a person:
+You can sign in to Bluesky and Mastodon without a person:
 
 ```sh
 printf '%s\n' "$APP_PASSWORD" | socli login bluesky --handle you.bsky.social --password-stdin
-socli login threads --token "$THREADS_ACCESS_TOKEN"
 socli login mastodon --token "$MASTODON_ACCESS_TOKEN" --server mastodon.social
 ```
+
+Threads answers `Waiting for Meta approval` and exits 1. In agent mode stderr is `{"error":"Waiting for Meta approval"}`. Do not pass a token. `--net threads` and `SOCLI_NET=threads` fail the same way. `--net all` leaves Threads out. That hold is outside `--demo`.
 
 X and dev/null sign-ins need a browser, and so does `socli login mastodon` without a token. In agent mode `socli login x`, `socli login devnull` and a token-less `socli login mastodon` exit 2 with a message such as `signing in to X needs a person at a browser`. Ask the person to run the command in a terminal, then continue with the stored session. Never run `socli logout` unless the person asks for it.
 

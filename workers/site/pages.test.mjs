@@ -171,6 +171,7 @@ test("the reader is an asset and a terminal return still leaves the homepage", a
   assert.equal(readerAssetPath("/assets/app.js"), "/assets/app.js")
   assert.equal(readerAssetPath("/fonts/GeistMono-Regular.otf"), "/fonts/GeistMono-Regular.otf")
   assert.equal(readerAssetPath("/favicon.ico"), "/favicon.ico")
+  assert.equal(readerAssetPath("/install.sh"), "/install.sh")
   assert.equal(readerAsset("/privacy"), false)
   assert.equal(readerAsset("/terms.html"), false)
   assert.equal(readerAsset("/data-deletion"), false)

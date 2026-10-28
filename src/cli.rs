@@ -447,9 +447,6 @@ enum AuthThreads {
 
 pub fn main() {
     if let Err(err) = run() {
-        if err.contains("Broken pipe") {
-            return;
-        }
         if err.is_empty() {
             std::process::exit(1);
         }
@@ -550,7 +547,7 @@ fn run() -> Result<(), String> {
         Some(Command::Help { command }) => show_help(command.as_deref()),
         Some(Command::Login { net }) => login(net),
         Some(Command::Logout { net }) => logout(&net),
-        Some(Command::Whoami) => whoami(),
+        Some(Command::Whoami) => whoami(&cli),
         Some(Command::View { target }) => view(&cli, &target),
         Some(Command::Config { command }) => config_command(command),
         Some(Command::Drafts { command }) => drafts_command(command),
@@ -623,10 +620,13 @@ fn login(net: LoginNet) -> Result<(), String> {
             net::devnull::login(args.device_name)?;
             signed_in(Network::Devnull)
         }
-        LoginNet::Threads(args) => {
-            net::threads::login(args.token, args.app_secret)?;
-            signed_in(Network::Threads)
-        }
+        LoginNet::Threads(args) => match Network::Threads.hold() {
+            Some(message) => Err(message.into()),
+            None => {
+                net::threads::login(args.token, args.app_secret)?;
+                signed_in(Network::Threads)
+            }
+        },
         LoginNet::Mastodon(args) => mastodon_login(args),
     }
 }
@@ -792,13 +792,14 @@ struct Account {
     url: Option<String>,
 }
 
-fn whoami() -> Result<(), String> {
-    let clients = Clients::load(&config::load()?)?;
-    let signed: Vec<_> = clients
-        .infos()
-        .into_iter()
-        .filter(|info| info.signed_in)
-        .collect();
+fn whoami(cli: &Cli) -> Result<(), String> {
+    refuse_named_hold(net_value(cli).as_deref(), cli.demo)?;
+    let infos = if cli.demo {
+        state::demo_networks()
+    } else {
+        Clients::load(&config::load()?)?.infos()
+    };
+    let signed: Vec<_> = infos.into_iter().filter(|info| info.signed_in).collect();
     if json_output() {
         let accounts: Vec<Account> = Network::ALL
             .into_iter()
@@ -892,24 +893,33 @@ fn auth(command: AuthCommand) -> Result<(), String> {
             AuthDevnull::Logout => auth_logout(Network::Devnull),
         },
         AuthCommand::Threads { command } => match command {
-            AuthThreads::Login(args) => {
-                net::threads::login(args.token, args.app_secret)?;
-                signed_in(Network::Threads)
-            }
+            AuthThreads::Login(args) => match Network::Threads.hold() {
+                Some(message) => Err(message.into()),
+                None => {
+                    net::threads::login(args.token, args.app_secret)?;
+                    signed_in(Network::Threads)
+                }
+            },
             AuthThreads::Oauth {
                 app_id,
                 app_secret,
                 redirect_uri,
                 scopes,
-            } => {
-                needs_browser(Network::Threads, "socli auth threads oauth");
-                net::threads::oauth(app_id, app_secret, redirect_uri, scopes)?;
-                auth_done(Network::Threads, "oauth", String::new())
-            }
-            AuthThreads::Refresh => {
-                net::threads::refresh()?;
-                auth_done(Network::Threads, "refresh", String::new())
-            }
+            } => match Network::Threads.hold() {
+                Some(message) => Err(message.into()),
+                None => {
+                    needs_browser(Network::Threads, "socli auth threads oauth");
+                    net::threads::oauth(app_id, app_secret, redirect_uri, scopes)?;
+                    auth_done(Network::Threads, "oauth", String::new())
+                }
+            },
+            AuthThreads::Refresh => match Network::Threads.hold() {
+                Some(message) => Err(message.into()),
+                None => {
+                    net::threads::refresh()?;
+                    auth_done(Network::Threads, "refresh", String::new())
+                }
+            },
             AuthThreads::Logout => auth_logout(Network::Threads),
         },
         AuthCommand::Mastodon { command } => match command {
@@ -1101,6 +1111,10 @@ struct DraftRow<'a> {
     targets: &'a [String],
     text: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
+    sending: Option<&'a [String]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     reply_to: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     quote: Option<&'a str>,
@@ -1115,6 +1129,8 @@ impl<'a> DraftRow<'a> {
             id: &draft.id,
             targets: &draft.targets,
             text: &draft.text,
+            sending: (!draft.sending.is_empty()).then_some(draft.sending.as_slice()),
+            warning: draft.sending_status(),
             reply_to: draft.reply_to.as_deref(),
             quote: draft.quote.as_deref(),
             created_at: draft.created_at.to_rfc3339(),
@@ -1321,6 +1337,26 @@ fn net_list(cli: &Cli) -> Result<Option<Vec<Network>>, String> {
     net_value(cli).as_deref().map(net::parse_list).transpose()
 }
 
+/// An explicit network list that names a paused network. `all` stays, and demo mode stays.
+fn refuse_named_hold(value: Option<&str>, demo: bool) -> Result<(), String> {
+    if demo {
+        return Ok(());
+    }
+    let Some(value) = value else {
+        return Ok(());
+    };
+    if value
+        .split(',')
+        .any(|part| part.trim().eq_ignore_ascii_case("all"))
+    {
+        return Ok(());
+    }
+    if let Some(message) = net::parse_list(value)?.iter().find_map(|net| net.hold()) {
+        return Err(message.into());
+    }
+    Ok(())
+}
+
 fn net_value(cli: &Cli) -> Option<String> {
     cli.net.clone().or_else(|| {
         std::env::var("SOCLI_NET")
@@ -1343,8 +1379,9 @@ fn dispatch(cli: &Cli, command: Option<Command>) -> Result<(), String> {
     let json = cli.json || (agent::active() && !print);
     let dry_run = cli.dry_run;
     let config = config::load()?;
-    let nets = net_list(cli)?;
     let demo = cli.demo;
+    refuse_named_hold(net_value(cli).as_deref(), demo)?;
+    let nets = net_list(cli)?;
     let mut clients = if demo {
         Clients::empty()
     } else {
@@ -1615,11 +1652,17 @@ fn prepare(state: &mut State, command: &Option<Command>) -> Result<(), String> {
 /// The `--net` list, else `default_network`, else the only network that can post (X in the demo).
 fn default_targets(state: &State, listed: Option<&[Network]>) -> Result<Vec<Network>, String> {
     if let Some(list) = listed {
+        if let Some(message) = list.iter().find_map(|net| state.held(*net)) {
+            return Err(message.into());
+        }
         return Ok(list.to_vec());
     }
     let can_post = state.post_targets();
     match (state.default_network, can_post.as_slice()) {
-        (Some(net), _) => Ok(vec![net]),
+        (Some(net), _) => match state.held(net) {
+            Some(message) => Err(message.into()),
+            None => Ok(vec![net]),
+        },
         (None, [only]) => Ok(vec![*only]),
         (None, _) if state.demo => Ok(vec![Network::X]),
         _ => {

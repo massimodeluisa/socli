@@ -64,7 +64,7 @@ Every post id is scoped as `<slug>:<native id>`, for example `x:<id>`, `threads:
 - Any other link fails with "SoCLI cannot read <input>. use a post id, or a link from x.com, bsky.app, dev-null.sh or a Mastodon server".
 - A bare id uses the network from a single `--net`, the selected scope, or `default_network`. When none applies, SoCLI asks "which network? add --net x|bluesky|devnull|threads|mastodon, or use a full id like bluesky:at://…".
 
-`--net` takes one slug, a comma list or `all`. It accepts the aliases `twitter`, `bsky`, `dev/null`, `dev-null` and `masto`. The `SOCLI_NET` environment variable sets the default, and `default_network` in the configuration does the same when it is unset.
+`--net` takes one slug, a comma list or `all`. It accepts the aliases `twitter`, `bsky`, `dev/null`, `dev-null` and `masto`. Naming `threads` answers `Waiting for Meta approval`, and `all` leaves Threads out while `Network::hold` is set. The `SOCLI_NET` environment variable sets the default, and `default_network` in the configuration does the same when it is unset.
 
 ## Credentials and configuration
 
@@ -75,7 +75,7 @@ SoCLI reads `config.toml` from `$SOCLI_CONFIG_DIR`, else `$XDG_CONFIG_HOME/socli
 | X | `auth_token`, `ct0`, `client_id`, `client_secret`, `access_token`, `refresh_token`, `expires_at`, `user_id`, `username`, `bearer_token`, `latest_query` | `X_AUTH_TOKEN`, `X_CT0`, `X_CLIENT_ID`, `X_CLIENT_SECRET`, `X_ACCESS_TOKEN`, `X_REFRESH_TOKEN`, `X_USER_ID`, `X_USERNAME`, `X_BEARER_TOKEN` | `socli login x` (browser session). `--oauth` uses a developer app |
 | Bluesky | `service`, `handle`, `did`, `access_jwt`, `refresh_jwt` | `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`, `BLUESKY_SERVICE` | `socli login bluesky` (`--handle`, `--service`, `--password-stdin`) |
 | dev/null | `username`, `device_key`, `device_approved`, `ssh_key` | none for credentials | `socli login devnull` (`--device-name`) |
-| Threads | `user_id`, `username`, `access_token`, `issued_at`, `expires_at` | `THREADS_ACCESS_TOKEN`, `THREADS_APP_SECRET` | `socli login threads` |
+| Threads | `user_id`, `username`, `access_token`, `issued_at`, `expires_at` | `THREADS_ACCESS_TOKEN`, `THREADS_APP_SECRET` | `socli login threads` answers `Waiting for Meta approval` until `Network::hold` is removed |
 | Mastodon | `server`, `client_id`, `client_secret`, `access_token`, `user_id`, `username`, `max_chars` | `MASTODON_ACCESS_TOKEN`, `MASTODON_SERVER` | `socli login mastodon` (`--server`, `--token`); without `--server` or `MASTODON_SERVER` it asks for the server, and an empty answer keeps `mastodon.social` |
 
 Other variables that affect the integrations: `SOCLI_NET`, `SOCLI_CONFIG_DIR`, `SOCLI_CACHE_DIR`, `SOCLI_AGENT`, `SOCLI_THEME`, `SOCLI_DENSITY`, `SOCLI_DETAIL`, `SOCLI_LAYOUT`, `SOCLI_MOUSE`, `SOCLI_ICONS`, `SOCLI_IMAGE`, `SOCLI_HYPERLINKS` and `NO_COLOR`. The `[<network>]` sections also hold the `color` key described below. `socli auth status` shows what is stored without printing secrets, and each network's `auth.md` has the details.
@@ -102,7 +102,7 @@ A network is a module under `src/net/<slug>/` that implements `Provider`, plus a
 
 - `Provider` has these methods: `network`, `caps`, `signed_in`, `account`, `me`, `feed`, `mentions`, `thread`, `user`, `search`, `post`, `delete`, `set_like`, `set_repost`, `set_bookmark` and `set_follow`. A method for something the network lacks returns `NetError::unsupported`, which prints as "<network> has no <thing> in its API", for example "Threads has no likes in its API".
 - `Caps` declares what the interface may offer: `feeds` (tabs with labels), `primary`, `mentions`, `search`, `like`, `repost`, `unrepost`, `quote`, `bookmark`, `follow`, `delete`, `thread`, `user`, `post`, `counts`, `views`, `like_verb`, `max_chars` and `count_graphemes`. `Caps::public(max_chars)` is the starting point for a client that can only read public threads and profiles.
-- `Clients` is the registry. `Clients::load` builds the clients from the configuration, and the other methods are `empty`, `get`, `providers_mut`, `infos` and `signed_in`. Bluesky, dev/null and Mastodon always exist so public reads work signed out, X and Threads exist when credentials are present.
+- `Clients` is the registry. `Clients::load` builds the clients from the configuration, and the other methods are `empty`, `get`, `providers_mut`, `infos` and `signed_in`. Bluesky, dev/null and Mastodon always exist so public reads work signed out. X exists when credentials are present. Threads exists when credentials are present, except while `Network::hold` returns a message: `Clients::load` then leaves that client out, and a live command that names Threads answers `Waiting for Meta approval` and does not call Meta.
 - The length rule of the network lives in `Network::text_len`, and `Network::profile_url` builds profile links.
 
 A complete integration also needs the five pages in `docs/integration/<slug>/` (`README.md`, `auth.md`, `endpoints.md`, `mapping.md`, `testing.md`) and a row in the tables on this page.

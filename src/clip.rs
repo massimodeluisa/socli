@@ -1,5 +1,6 @@
 //! Copies text to the clipboard with the system tool (pbcopy, clip.exe, wl-copy, xclip, xsel), or with OSC 52 over SSH and as the last resort.
 
+#[cfg(feature = "native")]
 use std::io::Write;
 #[cfg(feature = "native")]
 use std::process::{Command, Stdio};
@@ -26,7 +27,9 @@ pub fn take_open() -> Option<String> {
     OPENED.with(|slot| slot.borrow_mut().take())
 }
 
+#[cfg(feature = "native")]
 use base64::engine::general_purpose::STANDARD;
+#[cfg(feature = "native")]
 use base64::Engine;
 
 /// Where a copy ended up.
@@ -36,6 +39,7 @@ pub enum Via {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[cfg(any(test, feature = "native"))]
 enum Method {
     Pbcopy,
     ClipExe,
@@ -74,6 +78,7 @@ pub fn copy(text: &str) -> Result<Via, String> {
     }
 }
 
+#[cfg(any(test, feature = "native"))]
 fn order(env: &dyn Fn(&str) -> Option<String>, os: &str) -> Vec<Method> {
     let set = |key: &str| env(key).is_some_and(|value| !value.is_empty());
     if set("SSH_TTY") || set("SSH_CONNECTION") {
@@ -97,6 +102,7 @@ fn order(env: &dyn Fn(&str) -> Option<String>, os: &str) -> Vec<Method> {
     methods
 }
 
+#[cfg(any(test, feature = "native"))]
 fn command(method: Method) -> Option<(&'static str, &'static [&'static str])> {
     match method {
         Method::Pbcopy => Some(("pbcopy", &[])),

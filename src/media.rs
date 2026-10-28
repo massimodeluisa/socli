@@ -1,7 +1,10 @@
 //! Pictures for `--print` and `socli view` through the viuer library, and the image cache.
 
+#[cfg(feature = "native")]
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
+#[cfg(feature = "native")]
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use image::{DynamicImage, ImageError, ImageFormat, ImageReader, Limits, Rgba, RgbaImage};
@@ -13,9 +16,12 @@ use sha2::{Digest, Sha256};
 use viuer::Config;
 
 use crate::theme::{author_color, choice, Choice, Rgb, Theme};
+#[cfg(any(test, feature = "native"))]
 use crate::unfurl;
 
+#[cfg(any(test, feature = "native"))]
 const MAX_DOWNLOAD: u64 = 20 * 1024 * 1024;
+#[cfg(any(test, feature = "native"))]
 const MAX_REDIRECTS: usize = 5;
 const MAX_SIDE: u32 = 8192;
 const MAX_ALLOC: u64 = 64 * 1024 * 1024;
@@ -162,7 +168,19 @@ pub fn load(url: &str, origin: Origin) -> Result<Vec<u8>, String> {
             None => format!("not an image url: {url}"),
         });
     }
-    fs::read(path).map_err(|e| format!("couldn't read {}: {e}", path.display()))
+    let file = fs::File::open(path)
+        .map_err(|error| format!("couldn't read {}: {error}", path.display()))?;
+    if file.metadata().map_err(|error| error.to_string())?.len() > MAX_DOWNLOAD {
+        return Err(TOO_LARGE.into());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_DOWNLOAD + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("couldn't read {}: {error}", path.display()))?;
+    if bytes.len() as u64 > MAX_DOWNLOAD {
+        return Err(TOO_LARGE.into());
+    }
+    Ok(bytes)
 }
 
 /// [`load`] written to the image cache, for the viewer that draws from a file.
@@ -188,6 +206,7 @@ pub fn materialize(url: &str, origin: Origin) -> Result<PathBuf, String> {
 }
 
 /// Whether `url` starts with a URL scheme and `://`, which no local path does.
+#[cfg(any(test, feature = "native"))]
 fn has_scheme(url: &str) -> bool {
     url.split_once("://").is_some_and(|(scheme, _)| {
         scheme.starts_with(|ch: char| ch.is_ascii_alphabetic())
@@ -275,6 +294,7 @@ pub fn decode(bytes: &[u8]) -> Result<DynamicImage, String> {
     })
 }
 
+#[cfg(any(test, feature = "native"))]
 fn sniff_ext(bytes: &[u8]) -> &'static str {
     if bytes.starts_with(&[0x89, b'P', b'N', b'G']) {
         "png"
@@ -667,6 +687,20 @@ mod tests {
             assert!(demo.starts_with(&[0x89, b'P', b'N', b'G']));
         }
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn an_oversized_local_image_is_refused_before_reading_its_bytes() {
+        let path = std::env::temp_dir().join(format!(
+            "socli-media-large-{}-{:08x}",
+            std::process::id(),
+            rand::random::<u32>()
+        ));
+        let file = fs::File::create(&path).expect("temporary image");
+        file.set_len(MAX_DOWNLOAD + 1).expect("sparse image");
+        let result = load(path.to_str().expect("image path"), Origin::Typed);
+        fs::remove_file(path).expect("remove image");
+        assert_eq!(result, Err(TOO_LARGE.into()));
     }
 
     /// A PNG chunk: length, type, data and the CRC-32 of type and data.
