@@ -282,6 +282,10 @@ mod imp {
         pub struct HeaderValue(String);
 
         impl HeaderValue {
+            #[expect(
+                clippy::should_implement_trait,
+                reason = "matches reqwest's inherent HeaderValue::from_str API"
+            )]
             pub fn from_str(value: &str) -> Result<Self, InvalidHeaderValue> {
                 value.parse()
             }
