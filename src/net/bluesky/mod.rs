@@ -667,8 +667,12 @@ mod tests {
                         other => panic!("missing expected request: {other:?}"),
                     }
                 };
+                stream.set_nonblocking(false).unwrap();
                 stream
                     .set_read_timeout(Some(Duration::from_secs(3)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(3)))
                     .unwrap();
                 let mut reader = std::io::BufReader::new(&mut stream);
                 let mut request = String::new();
