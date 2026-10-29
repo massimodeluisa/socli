@@ -48,6 +48,7 @@ fn socli() -> Command {
         .env_remove("SOCLI_IMAGE")
         .env_remove("SOCLI_TRUECOLOR")
         .env_remove("SOCLI_TRACE_FRAMES")
+        .env_remove("SOCLI_PROGRAM_STATUS")
         .env_remove("COLORFGBG");
     for key in CREDENTIALS {
         cmd.env_remove(key);
@@ -1588,4 +1589,415 @@ fn an_unknown_theme_is_rejected() {
         err.contains("use auto, native, black, white or a theme from socli config themes"),
         "{err}"
     );
+}
+
+struct ProgramReport {
+    state: String,
+    id: Option<String>,
+    title: Option<String>,
+    message: Option<String>,
+    progress: Option<u8>,
+}
+
+fn program_reports(stderr: &[u8]) -> Vec<ProgramReport> {
+    use base64::Engine;
+    use std::collections::HashMap;
+
+    let text = std::str::from_utf8(stderr).unwrap();
+    let mut reports = Vec::new();
+    for tail in text.split("\x1b]7501;").skip(1) {
+        let end = tail.find("\x1b\\").unwrap();
+        let body = &tail[..end];
+        assert!(body.len() + "\x1b]7501;".len() + "\x1b\\".len() <= 4096);
+        let mut fields = HashMap::new();
+        for pair in body.split(':') {
+            let (key, value) = pair.split_once('=').unwrap();
+            assert!(!key.is_empty() && key.len() <= 16);
+            assert!(key.bytes().all(|byte| byte.is_ascii_lowercase()));
+            assert!(value
+                .bytes()
+                .all(|byte| { byte.is_ascii_alphanumeric() || b"_.,+/=-".contains(&byte) }));
+            assert!(fields.insert(key, value).is_none());
+        }
+        let state = *fields.get("state").unwrap();
+        assert!(matches!(
+            state,
+            "idle" | "working" | "blocked" | "done" | "error" | "clear"
+        ));
+        if state == "clear" {
+            assert!(fields.contains_key("id"), "{body}");
+            if let Some(app) = fields.get("app") {
+                assert_eq!(*app, "socli");
+            }
+        } else {
+            assert_eq!(fields.get("app"), Some(&"socli"));
+            assert!(
+                fields.contains_key("msg") && fields.contains_key("title"),
+                "{body}"
+            );
+        }
+        let progress = fields.get("progress").map(|progress| {
+            assert!(progress.bytes().all(|byte| byte.is_ascii_digit()));
+            let value = progress.parse::<u8>().unwrap();
+            assert!(value <= 100);
+            value
+        });
+        if state == "blocked" {
+            assert!(matches!(
+                fields.get("kind"),
+                Some(&"auth" | &"permission" | &"question")
+            ));
+        } else {
+            assert!(!fields.contains_key("kind"), "{body}");
+        }
+        for (key, encoded_limit, decoded_limit) in [("msg", 2732, 2048), ("title", 256, 192)] {
+            if let Some(encoded) = fields.get(key) {
+                assert!(encoded.len() <= encoded_limit);
+                let decoded = base64::engine::general_purpose::STANDARD
+                    .decode(encoded)
+                    .unwrap();
+                assert!(decoded.len() <= decoded_limit);
+                let decoded = std::str::from_utf8(&decoded).unwrap();
+                assert!(!decoded.chars().any(char::is_control));
+            }
+        }
+        let decode = |key| {
+            fields.get(key).map(|encoded| {
+                String::from_utf8(
+                    base64::engine::general_purpose::STANDARD
+                        .decode(encoded)
+                        .unwrap(),
+                )
+                .unwrap()
+            })
+        };
+        let title = decode("title");
+        let message = decode("msg");
+        let id = fields.get("id").map(|id| (*id).to_string());
+        match id.as_deref() {
+            None => assert_eq!(title.as_deref(), Some("SoCLI")),
+            Some(id) => {
+                let parts: Vec<_> = id.split('/').collect();
+                assert_eq!(parts.len(), 3, "{id}");
+                assert_eq!(parts[0], "network");
+                let network = match parts[1] {
+                    "x" => "X",
+                    "bluesky" => "Bluesky",
+                    "devnull" => "dev/null",
+                    "threads" => "Threads",
+                    "mastodon" => "Mastodon",
+                    _ => panic!("unexpected child network: {id}"),
+                };
+                assert!(matches!(parts[2], "read" | "post" | "action" | "auth"));
+                if let Some(title) = &title {
+                    assert_eq!(title, &format!("{network} {}", parts[2]));
+                }
+            }
+        }
+        reports.push(ProgramReport {
+            state: state.into(),
+            id,
+            title,
+            message,
+            progress,
+        });
+    }
+    reports
+}
+
+fn assert_program_lifecycle(stderr: &[u8], end: &str) -> Vec<ProgramReport> {
+    let reports = program_reports(stderr);
+    let roots: Vec<_> = reports
+        .iter()
+        .filter(|report| report.id.is_none())
+        .collect();
+    assert_eq!(
+        roots.first().map(|report| report.state.as_str()),
+        Some("working")
+    );
+    assert_eq!(roots.last().map(|report| report.state.as_str()), Some(end));
+    assert!(roots
+        .iter()
+        .all(|report| report.title.as_deref() == Some("SoCLI")));
+    reports
+}
+
+#[test]
+fn program_status_keeps_demo_json_on_stdout_and_reports_complete_records_on_stderr() {
+    let baseline = socli().args(["--demo", "--json", "help"]).output().unwrap();
+    assert!(baseline.status.success());
+    assert!(!baseline.stdout.contains(&0x1b));
+    assert!(baseline.stderr.is_empty());
+    let value: serde_json::Value = serde_json::from_slice(&baseline.stdout).unwrap();
+    assert_eq!(value["version"], env!("CARGO_PKG_VERSION"));
+
+    for agent in ["0", "1"] {
+        let out = socli()
+            .env("SOCLI_PROGRAM_STATUS", "on")
+            .env("SOCLI_AGENT", agent)
+            .args(["--demo", "--json", "help"])
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{out:?}");
+        assert_eq!(out.stdout, baseline.stdout);
+        let reports = assert_program_lifecycle(&out.stderr, "done");
+        assert!(reports.iter().all(|report| report.message.is_some()));
+    }
+}
+
+#[test]
+fn program_status_reports_failure_without_copying_private_config_values() {
+    let dir = own_config("program-status-sensitive-path");
+    let private = "private-token-that-must-not-reach-program-status";
+    std::fs::write(
+        dir.join("config.toml"),
+        format!("[x]\naccess_token = [\"{private}\"]\n"),
+    )
+    .unwrap();
+    let out = socli()
+        .env("SOCLI_PROGRAM_STATUS", "on")
+        .env("SOCLI_CONFIG_DIR", &dir)
+        .args(["config", "list", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    let reports = assert_program_lifecycle(&out.stderr, "error");
+    for report in reports {
+        let message = report.message.unwrap_or_default();
+        assert!(!message.contains(private));
+        assert!(!message.contains("program-status-sensitive-path"));
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn program_status_does_not_copy_post_text_into_terminal_metadata() {
+    let text = "private demo post content";
+    let out = socli()
+        .env("SOCLI_PROGRAM_STATUS", "on")
+        .args(["--demo", "--json", "post", text, "--net", "x"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert!(!out.stdout.contains(&0x1b));
+    let posts: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(posts[0]["text"], text);
+    let reports = assert_program_lifecycle(&out.stderr, "done");
+    assert!(reports.iter().all(|report| !report
+        .message
+        .as_deref()
+        .unwrap_or_default()
+        .contains(text)));
+}
+
+#[test]
+fn program_status_titles_and_messages_ignore_raw_and_malformed_private_input() {
+    let private = "PrivateMetadataSentinel_日本語";
+    let text = format!("{private}\n\u{1b}]0;private title\u{7}\u{202e}{{bad:json}}");
+    let out = socli()
+        .env("SOCLI_PROGRAM_STATUS", "on")
+        .args(["--demo", "--json", "post", &text, "--raw", "--net", "x"])
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    let posts: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(posts[0]["text"], text);
+    let mut reports = assert_program_lifecycle(&out.stderr, "done");
+
+    let malformed = format!("--{private}\r\n\u{1b}]0;private title\u{7}");
+    let out = socli()
+        .env("SOCLI_PROGRAM_STATUS", "on")
+        .args(["--json", &malformed])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    reports.extend(assert_program_lifecycle(&out.stderr, "error"));
+    for report in reports {
+        for field in [report.title, report.message].into_iter().flatten() {
+            assert!(!field.contains(private), "{field:?}");
+            assert!(!field.contains("private title"), "{field:?}");
+            assert!(!field.chars().any(char::is_control), "{field:?}");
+            assert!(!field.contains('\u{202e}'), "{field:?}");
+        }
+    }
+}
+
+#[test]
+fn program_status_tracks_real_provider_reads_without_copying_private_metadata() {
+    use std::net::TcpListener;
+    use std::time::{Duration, Instant};
+
+    for status in [200, 503] {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let service = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            Instant::now() < deadline,
+                            "CLI did not connect to its test server"
+                        );
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(error) => panic!("accepting fixture request: {error}"),
+                }
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            stream
+                .set_write_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut request = BufReader::new(stream);
+            let mut first = String::new();
+            request.read_line(&mut first).unwrap();
+            let mut bytes = first.len();
+            loop {
+                let mut header = String::new();
+                let read = request.read_line(&mut header).unwrap();
+                assert!(read > 0, "fixture request ended before its headers");
+                bytes += read;
+                assert!(bytes <= 8192, "fixture request headers exceeded 8 KiB");
+                if header == "\r\n" {
+                    break;
+                }
+            }
+            let body = if status == 200 {
+                r#"{"feed":[]}"#
+            } else {
+                r#"{"error":"Unavailable","message":"private-server-detail"}"#
+            };
+            let reason = if status == 200 {
+                "OK"
+            } else {
+                "Service Unavailable"
+            };
+            write!(request.get_mut(), "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            request.get_mut().flush().unwrap();
+            first
+        });
+        let dir = own_config(&format!("program-status-loopback-{status}"));
+        let handle = "private-handle.invalid";
+        let token = "private-token-for-loopback";
+        let config = format!(
+            "[bluesky]\nhandle = '{handle}'\ndid = 'did:plc:fixture'\naccess_jwt = '{token}'\nservice = '{service}'\n"
+        );
+        std::fs::write(dir.join("config.toml"), &config).unwrap();
+        let out = socli()
+            .env("SOCLI_CONFIG_DIR", &dir)
+            .env("SOCLI_PROGRAM_STATUS", "on")
+            .env("NO_PROXY", "*")
+            .env("no_proxy", "*")
+            .args(["--net", "bluesky", "--json", "feed", "following"])
+            .output()
+            .unwrap();
+        let request = server.join().expect("loopback server");
+        assert!(
+            request.starts_with("GET /xrpc/app.bsky.feed.getTimeline?"),
+            "{request}"
+        );
+        assert!(request.contains("limit="), "{request}");
+        let end = if status == 200 { "done" } else { "error" };
+        let reports = assert_program_lifecycle(&out.stderr, end);
+        let child: Vec<_> = reports
+            .iter()
+            .filter(|report| report.id.as_deref() == Some("network/bluesky/read"))
+            .collect();
+        assert_eq!(
+            child.first().map(|report| report.state.as_str()),
+            Some("working")
+        );
+        assert!(child.iter().any(|report| report.state == end));
+        assert!(child
+            .iter()
+            .filter(|report| report.state != "clear")
+            .all(|report| report.title.as_deref() == Some("Bluesky read")));
+        let progress: Vec<_> = reports
+            .iter()
+            .filter(|report| report.id.is_none())
+            .filter_map(|report| report.progress)
+            .collect();
+        assert_eq!(progress.first(), Some(&0));
+        assert_eq!(progress.last(), Some(&100));
+        assert!(progress.windows(2).all(|pair| pair[0] <= pair[1]));
+        for report in reports {
+            for field in [report.title, report.message].into_iter().flatten() {
+                for private in [handle, token, service.as_str(), "private-server-detail"] {
+                    assert!(!field.contains(private), "{field:?}");
+                }
+            }
+        }
+        if status == 200 {
+            assert!(out.status.success(), "{out:?}");
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap(),
+                serde_json::json!([])
+            );
+        } else {
+            assert_eq!(out.status.code(), Some(1));
+            assert!(out.stdout.is_empty());
+        }
+        assert_eq!(
+            std::fs::read_to_string(dir.join("config.toml")).unwrap(),
+            config
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[test]
+fn program_status_covers_version_and_usage_exit_paths() {
+    let out = socli()
+        .env("SOCLI_PROGRAM_STATUS", "on")
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(
+        String::from_utf8(out.stdout).unwrap(),
+        format!("socli {}\n", env!("CARGO_PKG_VERSION"))
+    );
+    assert_program_lifecycle(&out.stderr, "done");
+
+    let private = "--private-unrecognized-argument";
+    let out = socli()
+        .env("SOCLI_PROGRAM_STATUS", "on")
+        .arg(private)
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(2));
+    assert!(out.stdout.is_empty());
+    let reports = assert_program_lifecycle(&out.stderr, "error");
+    assert!(reports.iter().all(|report| !report
+        .message
+        .as_deref()
+        .unwrap_or_default()
+        .contains(private)));
+}
+
+#[test]
+fn program_status_is_silent_for_redirected_and_agent_output_unless_enabled() {
+    for mode in [None, Some("auto"), Some("off")] {
+        for agent in ["0", "1"] {
+            let mut command = socli();
+            if let Some(mode) = mode {
+                command.env("SOCLI_PROGRAM_STATUS", mode);
+            }
+            let out = command
+                .env("SOCLI_AGENT", agent)
+                .args(["--demo", "--json", "feed"])
+                .output()
+                .unwrap();
+            assert!(out.status.success(), "{out:?}");
+            assert!(!out.stdout.contains(&0x1b));
+            assert!(out.stderr.is_empty(), "{out:?}");
+            let posts: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            assert!(posts.as_array().unwrap().len() > 10);
+        }
+    }
 }

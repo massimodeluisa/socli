@@ -661,6 +661,7 @@ fn prompt_rail_menu(labels: &[String]) -> Result<usize, String> {
     use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
     use crossterm::terminal;
 
+    let mut waiting = crate::program_status::waiting(crate::program_status::Kind::Auth);
     let width = login_width();
     let color = login_color();
     terminal::enable_raw_mode().map_err(|err| err.to_string())?;
@@ -686,8 +687,10 @@ fn prompt_rail_menu(labels: &[String]) -> Result<usize, String> {
                 || (key.code == KeyCode::Char('c')
                     && key.modifiers.contains(KeyModifiers::CONTROL));
             if cancel {
+                crate::program_status::cancel();
                 break Err("cancelled".to_string());
             }
+            waiting.acknowledge();
             match key.code {
                 KeyCode::Enter => break Ok(selected),
                 KeyCode::Tab | KeyCode::Right | KeyCode::Down | KeyCode::Char('j') => {

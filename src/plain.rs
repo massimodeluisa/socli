@@ -50,8 +50,12 @@ pub fn emit(text: &str) {
     let mut out = io::stdout().lock();
     if let Err(err) = out.write_all(text.as_bytes()).and_then(|()| out.flush()) {
         if err.kind() == io::ErrorKind::BrokenPipe {
+            #[cfg(feature = "native")]
+            crate::program_status::finish(true);
             std::process::exit(0);
         }
+        #[cfg(feature = "native")]
+        crate::program_status::set(crate::program_status::Status::Error);
         eprintln!("socli: couldn't write the output: {err}");
         std::process::exit(1);
     }
@@ -237,7 +241,16 @@ fn ordered_posts(state: &State) -> Vec<Post> {
 pub fn repl(state: &mut State, clients: &mut Clients, opts: &PrintOpts) -> Result<(), String> {
     print_state(state, opts)?;
     let stdin = io::stdin();
+    let mut failed = false;
     loop {
+        #[cfg(feature = "native")]
+        crate::program_status::set(if failed {
+            crate::program_status::Status::Error
+        } else {
+            crate::program_status::Status::Idle
+        });
+        #[cfg(not(feature = "native"))]
+        let _ = failed;
         emit(if opts.color {
             "\x1b[1mSoCLI>\x1b[0m "
         } else {
@@ -246,31 +259,51 @@ pub fn repl(state: &mut State, clients: &mut Clients, opts: &PrintOpts) -> Resul
         let mut line = String::new();
         let n = stdin.read_line(&mut line).map_err(|e| e.to_string())?;
         if n == 0 {
+            #[cfg(feature = "native")]
+            crate::program_status::cancel();
             emit_line("");
             return Ok(());
         }
         let line = line.trim();
+        failed = false;
+        #[cfg(feature = "native")]
+        crate::program_status::acknowledge();
         if line.is_empty() {
             continue;
         }
+        #[cfg(feature = "native")]
+        crate::program_status::set(crate::program_status::Status::Working(
+            crate::program_status::Activity::Command,
+        ));
         if let Some(tab) = merged_tab(state, line) {
             match state.open_merged_tab(tab, clients) {
                 Ok(()) => print_state(state, opts)?,
-                Err(err) => emit_line(&util::clean(&err)),
+                Err(err) => {
+                    failed = true;
+                    emit_line(&util::clean(&err));
+                }
             }
             continue;
         }
         let cmd = match command::parse(line) {
             Ok(cmd) => cmd,
             Err(err) => {
+                failed = true;
                 emit_line(&util::clean(&err));
                 continue;
             }
         };
         match dispatch(state, clients, cmd, opts) {
-            Ok(true) => return Ok(()),
+            Ok(true) => {
+                #[cfg(feature = "native")]
+                crate::program_status::cancel();
+                return Ok(());
+            }
             Ok(false) => {}
-            Err(err) => emit_line(&util::clean(&err)),
+            Err(err) => {
+                failed = true;
+                emit_line(&util::clean(&err));
+            }
         }
     }
 }

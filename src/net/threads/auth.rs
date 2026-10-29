@@ -257,6 +257,18 @@ pub fn page_copy() -> (Vec<(String, String)>, String) {
 }
 
 pub fn login(token: Option<String>, app_secret: Option<String>) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(Network::Threads, crate::program_status::TaskKind::Auth)
+            .finish(login_impl(token, app_secret))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        login_impl(token, app_secret)
+    }
+}
+
+fn login_impl(token: Option<String>, app_secret: Option<String>) -> Result<(), String> {
     let http = http::client().map_err(|e| e.to_string())?;
     let hint = "Pass the token: socli login threads --token <token>";
     if let Some(token) = non_empty(token).or_else(|| env("THREADS_ACCESS_TOKEN")) {
@@ -339,7 +351,11 @@ fn login_shared(http: Client) -> Result<(), String> {
         None,
     )?;
     let _ = util::open_browser(&url);
-    let (code, got_state) = accept_code(&listener)?;
+    let (code, got_state) = {
+        #[cfg(feature = "native")]
+        let _waiting = crate::program_status::waiting(crate::program_status::Kind::Auth);
+        accept_code(&listener)?
+    };
     if got_state != state {
         return Err("oauth state did not match. try `socli login threads` again.".into());
     }
@@ -379,6 +395,10 @@ fn accept_code(listener: &std::net::TcpListener) -> Result<(String, String), Str
             &mut stream,
             "Threads did not grant access. You can close this tab.",
         );
+        #[cfg(feature = "native")]
+        if error == "access_denied" {
+            crate::program_status::cancel();
+        }
         return Err(format!("authorization failed: {error}"));
     }
     let code =
@@ -475,6 +495,23 @@ pub fn oauth(
     redirect_uri: String,
     scopes: Option<String>,
 ) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(Network::Threads, crate::program_status::TaskKind::Auth)
+            .finish(oauth_impl(app_id, app_secret, redirect_uri, scopes))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        oauth_impl(app_id, app_secret, redirect_uri, scopes)
+    }
+}
+
+fn oauth_impl(
+    app_id: String,
+    app_secret: String,
+    redirect_uri: String,
+    scopes: Option<String>,
+) -> Result<(), String> {
     let (app_id, app_secret, redirect_uri) = (
         app_id.trim().to_string(),
         app_secret.trim().to_string(),
@@ -497,7 +534,7 @@ pub fn oauth(
         Some("Redirect url:"),
     )?;
     let _ = util::open_browser(&url);
-    let pasted = util::prompt_line(
+    let pasted = util::prompt_auth(
         "",
         "Open the sign-in in a browser yourself: socli auth threads oauth",
     )?;

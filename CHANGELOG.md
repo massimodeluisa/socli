@@ -4,6 +4,9 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Added native OSC 7501 status reports for supporting terminals, with activity, input waits, cancellation and an explicit stderr output policy.
+- Named the main terminal task SoCLI, added child tasks for each network operation and reported feed-load progress from completed provider requests. Cleared completed child tasks after input and all owned child tasks on cancellation without exposing request content or account details.
+
 ## [0.1.4] - 2026-10-29
 
 This release fixed cases where a failed request could appear successful, a refresh could replace a newer login, or a saved draft could lose the warning that its post may already have reached the network. It also kept cached feed content available during partial outages and added installers for Linux and macOS.

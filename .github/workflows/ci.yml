@@ -76,6 +76,9 @@ jobs:
           toolchain: 1.99.1
           components: rustfmt, clippy
       - run: cargo test --locked
+      - name: Exercise terminal program status
+        if: runner.os != 'Windows'
+        run: python3 scripts/program-status.test.py target/debug/socli
 
   wasm:
     name: wasm

@@ -43,12 +43,16 @@ pub fn authorize(url: &url::Url) -> Result<String, String> {
         }
         Err(err) => return Err(format!("could not prepare browser sign-in: {err}")),
     }
-    let result = std::process::Command::new(&executable)
-        .arg(url.as_str())
-        .output()
-        .map_err(|err| format!("could not open browser sign-in: {err}"))?;
+    let result = {
+        let _waiting = crate::program_status::waiting(crate::program_status::Kind::Auth);
+        std::process::Command::new(&executable)
+            .arg(url.as_str())
+            .output()
+            .map_err(|err| format!("could not open browser sign-in: {err}"))?
+    };
     if !result.status.success() {
         return Err(if result.status.code() == Some(130) {
+            crate::program_status::cancel();
             "cancelled".into()
         } else {
             "the browser could not complete sign-in. Retry, or set SOCLI_AUTH_BROWSER=manual for the pasted callback procedure".into()

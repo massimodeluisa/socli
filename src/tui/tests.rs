@@ -24,6 +24,32 @@ fn composer_for(text: &str, target: Network, overlay: Overlay) -> Composer {
     }
 }
 
+#[cfg(feature = "native")]
+#[test]
+fn program_status_tracks_work_prompts_and_results_without_their_contents() {
+    let mut state = State::boot(true, 15, &Config::default(), &Clients::empty(), None);
+    state.status_error = None;
+    state.status_expiry = None;
+    assert_eq!(reader_status(&Mode::Normal, &state, false), Status::Idle);
+    assert_eq!(
+        reader_status(&Mode::Normal, &state, true),
+        Status::Working(Activity::Loading)
+    );
+    let compose = Mode::Compose(Box::new(composer_for(
+        "private unsent text",
+        Network::Bluesky,
+        Overlay::Ask(After::Leave),
+    )));
+    assert_eq!(
+        reader_status(&compose, &state, false),
+        Status::Blocked(StatusKind::Question)
+    );
+    state.fail("private server error");
+    assert_eq!(reader_status(&Mode::Normal, &state, false), Status::Error);
+    state.confirm("private result");
+    assert_eq!(reader_status(&Mode::Normal, &state, false), Status::Done);
+}
+
 #[test]
 fn signing_out_of_devnull_keeps_the_key_note_in_the_status() {
     assert_eq!(

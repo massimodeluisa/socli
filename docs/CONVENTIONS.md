@@ -63,6 +63,7 @@ Every file in `src/` and every folder in `src/net/` has one row.
 | `fixtures.rs` | Test-only fixtures: the frozen clock, the demo state, post builders, and the grapheme and control-text samples |
 | `model.rs` | Posts, people, metrics and feeds as the reader sees them, and `Post::to_json` |
 | `plain.rs` | The scrollback printer behind `--print` and the `SoCLI>` prompt |
+| `program_status.rs` | Native OSC 7501 status reports for terminal hosts such as Rex, with provider child tasks, measured feed-load progress, prompt waits, cancellation and output policy |
 | `preview.rs` | The image picker facade. Native builds use `preview_native.rs`. The browser build does not fetch |
 | `preview_native.rs` | The image picker and the background loader for previews, avatars and inline images. Native builds only |
 | `render.rs` | The canvas, the post, thread and notification bodies, and the painting |
@@ -90,7 +91,7 @@ Every file in `src/` and every folder in `src/net/` has one row.
 
 Renderers draw through the `Canvas` in `render.rs`, at the absolute columns of the grid in [DESIGN.md](DESIGN.md). They return `StyledLine` values and never write ANSI escape codes themselves, because painting belongs to `paint_with` and `ratatui_style` in `render.rs`.
 
-Text from the networks can carry terminal control sequences, so it reaches the screen only through code that cleans it. `Canvas::put` and the `StyledLine` constructors pass their text through `util::clean`, and CLI text output that prints network data outside a `StyledLine` calls `util::clean` itself. Only the app adds escape sequences: the OSC 8 links from `hyperlink::wrap` and the color codes from `paint_with`, both applied after cleaning. Widths are measured per grapheme cluster with `util::graphemes`, which uses the `unicode-width` measure that ratatui uses.
+Text from the networks can carry terminal control sequences, so it reaches the screen only through code that cleans it. `Canvas::put` and the `StyledLine` constructors pass their text through `util::clean`, and CLI text output that prints network data outside a `StyledLine` calls `util::clean` itself. Only the app adds escape sequences: OSC 8 links from `hyperlink::wrap` and color codes from `paint_with` follow cleaning, while `program_status` writes OSC 7501 reports from fixed activity descriptions. Widths are measured per grapheme cluster with `util::graphemes`, which uses the `unicode-width` measure that ratatui uses.
 
 Every glyph in the Unicode icon set has to exist in Menlo, the default macOS terminal font. Private Use Area glyphs appear only in `theme::Icons`, and each one carries a comment with its Nerd Fonts name and codepoint, in the form `// nf-<set>-<name> U+XXXXX`, as in `// nf-md-heart U+F02D1`. A new screen starts as a mockup in `design/`, following the workflow in [DESIGN.md](DESIGN.md), before any Rust code draws it.
 
@@ -128,7 +129,11 @@ The process exits with 0 on success, 1 when a network or target failed, and 2 fo
 
 ## Output rules for pipes and agents
 
-Output that is not read by a person at a terminal carries no escape codes: no ANSI color, no OSC 8 hyperlinks, and no Nerd Font glyphs, because the icon choice falls back to Unicode icons when stdout is not a terminal or agent mode is on. `plain.rs` and `hyperlink.rs` check both conditions, and a new output path has to do the same. JSON is written through `say_json` in `cli.rs` and uses the field names of `Post::to_json`.
+Stdout that is not read by a person at a terminal carries no escape codes: no ANSI color, no OSC 8 hyperlinks, and no Nerd Font glyphs, because the icon choice falls back to Unicode icons when stdout is not a terminal or agent mode is on. `plain.rs` and `hyperlink.rs` check both conditions, and a new stdout path has to do the same. JSON is written through `say_json` in `cli.rs` and uses the field names of `Post::to_json`.
+
+Native [terminal status reports](../README.md#osc-7501-program-status) use stderr independently of stdout. OSC 7501 reporting is automatic only when stderr is a terminal, agent mode is off and `TERM` is not `dumb`. `SOCLI_PROGRAM_STATUS=on` (or `1`) explicitly enables those escapes even in redirected stderr or agent mode; `off` (or `0`) disables them. A caller parsing stderr while reporting is enabled must separate the reports from any JSON error line.
+
+Normal reports repeat `app=socli`, and every main report has the title `SoCLI`. Provider child tasks use `network/<slug>/<read|post|action|auth>` IDs and fixed titles such as `Bluesky read`; sign-in waits also block the matching child with `kind=auth`. Feed-load batches report main-task progress from completed provider requests, including failures, and omit progress when the batch ends. The reporter clears completed children on the next command or reader key and clears SoCLI's children on cancellation. A child `state=clear` record may omit `msg`, `title` and `app`; parsers must accept that form. Titles and messages contain no account names or request content. Reports send no probe or heartbeat. Status reporting reads no input and leaves command results unchanged. The browser reader does not emit these reports.
 
 ## Demo mode
 
@@ -142,7 +147,7 @@ A comment that restates the code does not belong in the repository. Keep a comme
 
 The [0.1.4 source review](REVIEW.md) records the failure paths covered by the regression suite and the boundaries that still need live-provider verification.
 
-Unit tests live in a `#[cfg(test)] mod tests` block next to the code they test. The integration tests in `tests/cli.rs` run the built binary through the `socli()` helper, which sets `SOCLI_CONFIG_DIR` to an empty temporary directory, `NO_COLOR=1`, `TERM_PROGRAM=vscode`, `TERM=xterm-256color`, `SSH_TTY=1` and `SOCLI_AGENT=0`, and removes `SOCLI_ICONS`, `NO_ICONS`, `SOCLI_NET`, `SOCLI_THEME`, `SOCLI_DENSITY`, `SOCLI_DETAIL`, `SOCLI_LAYOUT`, `SOCLI_MOUSE`, `SOCLI_IMAGE`, `SOCLI_TRUECOLOR`, `SOCLI_TRACE_FRAMES`, `COLORFGBG` and every network credential variable, so the output is the same on every machine. Tests never touch the network and never read or write `~/.config/socli`. A test that needs to write uses its own directory from `own_config`. Unit tests must not trigger a settings save, because that would write the real config. Renderer tests assert the columns of elbows, stats and folds, and check that no Private Use Area character appears in Unicode mode.
+Unit tests live in a `#[cfg(test)] mod tests` block next to the code they test. The integration tests in `tests/cli.rs` run the built binary through the `socli()` helper, which sets `SOCLI_CONFIG_DIR` to an empty temporary directory, `NO_COLOR=1`, `TERM_PROGRAM=vscode`, `TERM=xterm-256color`, `SSH_TTY=1` and `SOCLI_AGENT=0`, and removes `SOCLI_ICONS`, `NO_ICONS`, `SOCLI_NET`, `SOCLI_THEME`, `SOCLI_DENSITY`, `SOCLI_DETAIL`, `SOCLI_LAYOUT`, `SOCLI_MOUSE`, `SOCLI_IMAGE`, `SOCLI_TRUECOLOR`, `SOCLI_TRACE_FRAMES`, `SOCLI_PROGRAM_STATUS`, `COLORFGBG` and every network credential variable, so the output is the same on every machine. Tests use fixtures or a loopback HTTP server, never contact public networks and never read or write `~/.config/socli`. A test that needs to write uses its own directory from `own_config`. Unit tests must not trigger a settings save, because that would write the real config. Renderer tests assert the columns of elbows, stats and folds, and check that no Private Use Area character appears in Unicode mode.
 
 ## Configuration and secrets
 
@@ -189,6 +194,7 @@ Settings resolve in this order, first match wins:
 | `SOCLI_CONFIG_DIR` | The directory that holds `config.toml` and `drafts.json` |
 | `SOCLI_CACHE_DIR` | The image cache directory; without it SoCLI uses `$XDG_CACHE_HOME/socli`, then `~/.cache/socli` |
 | `SOCLI_AGENT` | `1` forces agent mode, `0` turns it off, anything else leaves detection on |
+| `SOCLI_PROGRAM_STATUS` | Native OSC 7501 status on stderr: `auto` or unset uses terminal detection with agent mode off and `TERM` other than `dumb`; `on` or `1` forces reports, including pipes and agents; `off` or `0` disables them |
 | `SOCLI_NET` | Networks to read or post to when `--net` is absent |
 | `SOCLI_THEME` | A theme name (see `ui.theme`) when `--theme` is absent |
 | `SOCLI_DENSITY` | `compact`, `cozy` or `roomy` when `--density` is absent |

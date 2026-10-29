@@ -14,6 +14,11 @@ const DEVICE_NAME_MAX: usize = 100;
 
 /// `socli login devnull`: dev/null only redirects to its app's `devnull://` callback, which the user pastes.
 pub fn login(device_name: Option<String>) -> Result<(), String> {
+    let task = crate::program_status::task(Network::Devnull, crate::program_status::TaskKind::Auth);
+    task.finish(login_impl(device_name))
+}
+
+fn login_impl(device_name: Option<String>) -> Result<(), String> {
     if !util::person_present() {
         return Err(format!(
             "{} Run socli login devnull in a terminal.",
@@ -73,7 +78,7 @@ pub fn login(device_name: Option<String>) -> Result<(), String> {
             Some("Callback:"),
         )?;
         let _ = util::open_browser(url.as_str());
-        util::prompt_line(
+        util::prompt_auth(
             "",
             "Open the sign-in in a browser yourself: socli login devnull",
         )?

@@ -14,6 +14,7 @@ use crate::media::{ImageMode, Origin, Viewer};
 use crate::model::{FeedId, Post, Scope, Section};
 use crate::net::{Clients, FeedKind, Network};
 use crate::plain::PrintOpts;
+use crate::program_status::{self, Activity, Status as ProgramStatus};
 use crate::render::{Kind, StyledLine};
 use crate::send::Done;
 use crate::state::State;
@@ -446,8 +447,11 @@ enum AuthThreads {
 }
 
 pub fn main() {
+    program_status::acknowledge();
+    program_status::set(ProgramStatus::Working(Activity::Command));
     if let Err(err) = run() {
         if err.is_empty() {
+            program_status::finish(false);
             std::process::exit(1);
         }
         if err.starts_with(util::NEEDS_PERSON) {
@@ -455,6 +459,7 @@ pub fn main() {
         }
         fail(&err, 1);
     }
+    program_status::finish(true);
 }
 
 /// Whether `flag` comes before any `--`, for the paths that run before or without clap.
@@ -482,6 +487,7 @@ fn terminal() -> bool {
 
 /// Prints `message` on stderr, as `{"error":…}` when errors are JSON, and exits with `code`.
 fn fail(message: &str, code: i32) -> ! {
+    program_status::finish(false);
     if json_errors() {
         eprintln!("{}", serde_json::json!({ "error": message }));
     } else {
@@ -500,6 +506,7 @@ fn clap_error(err: clap::Error) -> ! {
         err.kind(),
         ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
     );
+    program_status::finish(shown);
     if shown || !json_errors() {
         err.exit();
     }
@@ -609,6 +616,7 @@ fn help_width() -> usize {
 }
 
 fn login(net: LoginNet) -> Result<(), String> {
+    program_status::set(ProgramStatus::Working(Activity::SigningIn));
     match net {
         LoginNet::X(args) => x_login(args),
         LoginNet::Bluesky(args) => {
@@ -677,12 +685,16 @@ fn account_handle(net: Network) -> Result<Option<String>, String> {
 
 /// Imports the signed-in browser session, or runs OAuth when `--oauth` or `--client-id` is set.
 fn x_login(args: XLogin) -> Result<(), String> {
+    program_status::set(ProgramStatus::Working(Activity::SigningIn));
     needs_browser(Network::X, "socli login x");
     if args.oauth || args.client_id.is_some() || args.client_secret.is_some() {
         net::x::auth::login(args.client_id, args.client_secret, args.scopes, args.port)?;
     } else {
         match net::x::auth::login_browser(args.browser.as_deref(), args.profile.as_deref()) {
-            Err(err) if err == "cancelled" => return Ok(()),
+            Err(err) if err == "cancelled" => {
+                program_status::cancel();
+                return Ok(());
+            }
             other => other?,
         }
     }
@@ -1476,12 +1488,14 @@ fn dispatch(cli: &Cli, command: Option<Command>) -> Result<(), String> {
         };
         let unconfirmed = matches!(command, Some(Command::Delete { yes: false, .. }));
         if unconfirmed && !dry_run && !confirm_delete(net, json)? {
+            program_status::cancel();
             plain::emit_line("nothing deleted");
             return Ok(());
         }
         return write_action(&mut state, &mut clients, net, id, action, json, dry_run);
     }
 
+    program_status::set(ProgramStatus::Working(Activity::Loading));
     let first = match &command {
         Some(Command::Search { query }) => state
             .apply(Cmd::Search(query.join(" ")), &mut clients)
@@ -1718,10 +1732,12 @@ impl Publish<'_> {
                         publish(state, clients, &intent, self.dry_run, json, &drafts::path())
                     }
                     tui::Composed::Saved => {
+                        program_status::cancel();
                         plain::emit_line("draft saved");
                         Ok(())
                     }
                     tui::Composed::Discarded => {
+                        program_status::cancel();
                         plain::emit_line("nothing posted");
                         Ok(())
                     }
@@ -1735,6 +1751,11 @@ impl Publish<'_> {
                 ))
             }
         };
+        program_status::set(ProgramStatus::Working(if self.dry_run {
+            Activity::Command
+        } else {
+            Activity::Posting
+        }));
         let results = if self.dry_run {
             send::check(
                 state,
@@ -1773,6 +1794,11 @@ fn publish(
     store: &Path,
 ) -> Result<(), String> {
     intent.check()?;
+    program_status::set(ProgramStatus::Working(if dry_run {
+        Activity::Command
+    } else {
+        Activity::Posting
+    }));
     if dry_run {
         let results = send::check(
             state,
@@ -1852,7 +1878,7 @@ fn confirm_delete(net: Network, json: bool) -> Result<bool, String> {
     if json || !terminal() {
         usage_error("delete needs --yes when socli runs without a terminal");
     }
-    let answer = util::prompt_line(
+    let answer = util::prompt_permission(
         &format!("delete this post on {}? y/N ", net.title()),
         "Pass --yes to delete without asking.",
     )?;

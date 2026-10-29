@@ -96,13 +96,25 @@ fn clean_handle(handle: &str) -> Result<String, String> {
 
 /// `socli login bluesky`: username from `--handle`, `BLUESKY_HANDLE`, or a prompt; app password from `BLUESKY_APP_PASSWORD` or a hidden prompt.
 pub fn login(handle: Option<String>, service: Option<String>) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(Network::Bluesky, crate::program_status::TaskKind::Auth)
+            .finish(login_impl(handle, service))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        login_impl(handle, service)
+    }
+}
+
+fn login_impl(handle: Option<String>, service: Option<String>) -> Result<(), String> {
     let given = handle
         .map(|h| h.trim().to_string())
         .filter(|h| !h.is_empty())
         .or_else(|| env("BLUESKY_HANDLE"));
     let password = env("BLUESKY_APP_PASSWORD");
     if let (Some(handle), Some(password)) = (given.clone(), password.clone()) {
-        return login_with_password(handle, service, password);
+        return login_with_password_impl(handle, service, password);
     }
     if !util::person_present() {
         return Err(format!("{} {NO_PROMPT}", util::NEEDS_PERSON));
@@ -141,6 +153,22 @@ pub fn login(handle: Option<String>, service: Option<String>) -> Result<(), Stri
 
 /// Signs in without prompting: the same session, saved config and output as `login`.
 pub fn login_with_password(
+    handle: String,
+    service: Option<String>,
+    password: String,
+) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(Network::Bluesky, crate::program_status::TaskKind::Auth)
+            .finish(login_with_password_impl(handle, service, password))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        login_with_password_impl(handle, service, password)
+    }
+}
+
+fn login_with_password_impl(
     handle: String,
     service: Option<String>,
     password: String,

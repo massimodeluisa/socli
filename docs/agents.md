@@ -39,6 +39,8 @@ Agent mode makes SoCLI safe to run with nobody at the terminal:
 
 Without a command, `SOCLI_AGENT=1 socli` prints the home feed as JSON, which is the same as `socli feed --json`.
 
+[Terminal status reporting](../README.md#osc-7501-program-status) is off by default in agent mode. `SOCLI_PROGRAM_STATUS=on` (or `1`) forces OSC 7501 reports onto stderr while leaving stdout JSON unchanged. When you enable it, separate those reports from stderr's JSON errors before parsing them. The reports describe activity and input waits; commands still use the one-shot CLI described below.
+
 ## One-shot commands
 
 `socli help` lists every command, `socli help <command>` shows the flags and examples of one, and `socli help --json` prints the whole table as JSON, so an agent can read the current surface instead of this page. The commands an agent uses most:
@@ -259,7 +261,7 @@ Sign-in and sign-out commands print one object per account: `socli login <net>` 
 
 ## Errors and exit codes
 
-When errors are JSON (agent mode, or `--json`), a failure prints exactly one line on stderr and nothing on stdout:
+When errors are JSON (agent mode, or `--json`), a failure prints its error as one JSON line on stderr and nothing on stdout. Enabled [terminal status reports](../README.md#osc-7501-program-status) accompany that line:
 
 ```json
 {"error":"delete needs --yes when socli runs without a terminal"}

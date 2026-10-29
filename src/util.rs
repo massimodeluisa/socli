@@ -228,7 +228,11 @@ pub fn terminal_width(fallback: usize) -> usize {
 /// Maps a stdout write; a closed pipe (`socli feed --print | head`) ends the process quietly with status 0.
 pub fn written(result: io::Result<()>) -> Result<(), String> {
     match result {
-        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => std::process::exit(0),
+        Err(err) if err.kind() == io::ErrorKind::BrokenPipe => {
+            #[cfg(feature = "native")]
+            crate::program_status::finish(true);
+            std::process::exit(0)
+        }
         other => other.map_err(|e| e.to_string()),
     }
 }
@@ -257,6 +261,7 @@ pub fn prompt_choice(labels: &[&str], indent: &str) -> Result<usize, String> {
     if !person_present() {
         return Err(NEEDS_PERSON.into());
     }
+    let mut waiting = crate::program_status::waiting(crate::program_status::Kind::Question);
     let mut out = std::io::stderr();
     terminal::enable_raw_mode().map_err(|err| err.to_string())?;
     let result = {
@@ -298,8 +303,10 @@ pub fn prompt_choice(labels: &[&str], indent: &str) -> Result<usize, String> {
                     || (key.code == KeyCode::Char('c')
                         && key.modifiers.contains(KeyModifiers::CONTROL));
                 if cancel {
+                    crate::program_status::cancel();
                     break Some(labels.len() - 1);
                 }
+                waiting.acknowledge();
                 match key.code {
                     KeyCode::Enter => break Some(selected),
                     KeyCode::Tab | KeyCode::Right | KeyCode::Down | KeyCode::Char('j') => {
@@ -344,7 +351,7 @@ pub fn person_present() -> bool {
 pub fn prompt_line(label: &str, hint: &str) -> Result<String, String> {
     #[cfg(feature = "native")]
     {
-        read_prompt(label, hint, false)
+        read_prompt(label, hint, false, crate::program_status::Kind::Question)
     }
     #[cfg(not(feature = "native"))]
     {
@@ -353,11 +360,30 @@ pub fn prompt_line(label: &str, hint: &str) -> Result<String, String> {
     }
 }
 
+/// Reads a visible authentication answer without reporting its label or contents.
+pub(crate) fn prompt_auth(label: &str, hint: &str) -> Result<String, String> {
+    #[cfg(feature = "native")]
+    {
+        read_prompt(label, hint, false, crate::program_status::Kind::Auth)
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        let _ = label;
+        Err(format!("{NEEDS_PERSON} {hint}"))
+    }
+}
+
+/// Reads explicit permission to perform an action.
+#[cfg(feature = "native")]
+pub(crate) fn prompt_permission(label: &str, hint: &str) -> Result<String, String> {
+    read_prompt(label, hint, false, crate::program_status::Kind::Permission)
+}
+
 /// Reads a masked secret; Escape and Ctrl-C cancel without terminating the reader.
 pub fn prompt_secret(label: &str, hint: &str) -> Result<String, String> {
     #[cfg(feature = "native")]
     {
-        read_prompt(label, hint, true)
+        read_prompt(label, hint, true, crate::program_status::Kind::Auth)
     }
     #[cfg(not(feature = "native"))]
     {
@@ -367,7 +393,12 @@ pub fn prompt_secret(label: &str, hint: &str) -> Result<String, String> {
 }
 
 #[cfg(feature = "native")]
-fn read_prompt(label: &str, hint: &str, masked: bool) -> Result<String, String> {
+fn read_prompt(
+    label: &str,
+    hint: &str,
+    masked: bool,
+    kind: crate::program_status::Kind,
+) -> Result<String, String> {
     use crate::watchdog;
     use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
     use crossterm::terminal;
@@ -375,6 +406,7 @@ fn read_prompt(label: &str, hint: &str, masked: bool) -> Result<String, String> 
     if !person_present() {
         return Err(format!("{NEEDS_PERSON} {hint}"));
     }
+    let mut waiting = crate::program_status::waiting(kind);
     let mut out = std::io::stderr();
     crossterm::execute!(out, crossterm::cursor::Show).map_err(|e| e.to_string())?;
     write!(out, "{label}").map_err(|e| e.to_string())?;
@@ -393,6 +425,9 @@ fn read_prompt(label: &str, hint: &str, masked: bool) -> Result<String, String> 
                 Err(e) => break Err(format!("reading the terminal: {e}")),
             };
             let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+            if key.code != KeyCode::Esc && !(ctrl && matches!(key.code, KeyCode::Char('c' | 'd'))) {
+                waiting.acknowledge();
+            }
             match key.code {
                 KeyCode::Enter => {
                     break Ok(if masked {
@@ -401,8 +436,14 @@ fn read_prompt(label: &str, hint: &str, masked: bool) -> Result<String, String> 
                         answer.trim().to_string()
                     })
                 }
-                KeyCode::Esc => break Err("cancelled".to_string()),
-                KeyCode::Char('c' | 'd') if ctrl => break Err("cancelled".to_string()),
+                KeyCode::Esc => {
+                    crate::program_status::cancel();
+                    break Err("cancelled".to_string());
+                }
+                KeyCode::Char('c' | 'd') if ctrl => {
+                    crate::program_status::cancel();
+                    break Err("cancelled".to_string());
+                }
                 KeyCode::Backspace => {
                     if let Some(ch) = answer.pop() {
                         let cells = if masked { 1 } else { ch.to_string().width() };

@@ -30,6 +30,8 @@ pub mod onboard;
 pub mod palettes;
 pub mod plain;
 pub mod preview;
+#[cfg(feature = "native")]
+mod program_status;
 pub mod render;
 pub mod rich;
 pub mod screens;

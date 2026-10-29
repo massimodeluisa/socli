@@ -219,6 +219,21 @@ struct AccountRow<'a> {
 /// Each signed-in browser profile is a row. The last row opens x.com so a second account can be
 /// approved. `--browser` and `--profile` skip the question when they match one session.
 pub fn login_browser(browser: Option<&str>, profile: Option<&str>) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(
+            crate::net::Network::X,
+            crate::program_status::TaskKind::Auth,
+        )
+        .finish(login_browser_impl(browser, profile))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        login_browser_impl(browser, profile)
+    }
+}
+
+fn login_browser_impl(browser: Option<&str>, profile: Option<&str>) -> Result<(), String> {
     let _ = crate::screens::present_login(
         crate::net::Network::X.title(),
         &[
@@ -322,6 +337,21 @@ pub(crate) fn accept_browser_session(
 
 /** Pasted browser cookies. The profile is read before anything is written. */
 pub fn login_session(auth_token: String, ct0: String) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(
+            crate::net::Network::X,
+            crate::program_status::TaskKind::Auth,
+        )
+        .finish(login_session_impl(auth_token, ct0))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        login_session_impl(auth_token, ct0)
+    }
+}
+
+fn login_session_impl(auth_token: String, ct0: String) -> Result<(), String> {
     let creds = Credentials {
         auth_token: Some(auth_token.clone()),
         ct0: Some(ct0.clone()),
@@ -340,7 +370,18 @@ pub fn login(
     scopes: Option<String>,
     port: u16,
 ) -> Result<(), String> {
-    oauth(client_id, client_secret, scopes, port, true)
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(
+            crate::net::Network::X,
+            crate::program_status::TaskKind::Auth,
+        )
+        .finish(oauth(client_id, client_secret, scopes, port, true))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        oauth(client_id, client_secret, scopes, port, true)
+    }
 }
 
 fn oauth(
@@ -385,7 +426,11 @@ fn oauth(
         crate::screens::login_steps(&steps, &aside)?;
     }
     let _ = crate::util::open_browser(url.as_str());
-    let (code, got_state) = accept_code(&listener)?;
+    let (code, got_state) = {
+        #[cfg(feature = "native")]
+        let _waiting = crate::program_status::waiting(crate::program_status::Kind::Auth);
+        accept_code(&listener)?
+    };
     if got_state != state {
         return Err("oauth state did not match. try `socli login x` again.".into());
     }
@@ -632,6 +677,8 @@ fn accept_code(listener: &TcpListener) -> Result<(String, String), String> {
         let body = page("X did not grant access. You can close this tab.");
         let _ = write_http(&mut stream, &body);
         return Err(if error == "access_denied" {
+            #[cfg(feature = "native")]
+            crate::program_status::cancel();
             "X sign-in was cancelled. run `socli login x` to try again".into()
         } else {
             "X did not grant access. run `socli login x` again".into()

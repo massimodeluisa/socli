@@ -66,6 +66,8 @@ use crate::model::{FeedId, Post, Scope, Section};
 use crate::net::{self, Clients, Network};
 use crate::onboard;
 use crate::preview::{self, Previews, Shown};
+#[cfg(feature = "native")]
+use crate::program_status::{self, Activity, Kind as StatusKind, Status};
 use crate::render::{
     self, Act, Canvas, Kind, OverflowItem, RowSpan, Slot, StyledLine, Target, Zone,
 };
@@ -1257,6 +1259,9 @@ fn dispatch_press(
     clients: &Mutex<Clients>,
     press: Press,
 ) -> Result<bool, String> {
+    if !matches!(&press, Press::Mouse(mouse) if mouse.kind == MouseEventKind::Moved) {
+        program_status::acknowledge();
+    }
     let deferred = pass.defer;
     let gate = gate_press(clients, pass.state, pass.ui, deferred, press)?;
     match gate {
@@ -1298,6 +1303,7 @@ fn dispatch_press(
 
 #[cfg(feature = "native")]
 pub fn run(mut state: State, mut clients: Clients) -> Result<(), String> {
+    program_status::set(Status::Working(Activity::Loading));
     // The shell keeps `--count`. The reader never asks a network for a shorter page than 20.
     state.count = state::page_count(state.count);
     if let Err(err) = state.ensure_loaded(&mut clients) {
@@ -1408,6 +1414,11 @@ pub fn run(mut state: State, mut clients: Clients) -> Result<(), String> {
         dirty |= state.expire(Instant::now());
         dirty |= take_page(&mut state, &mut page_job);
         dirty |= take_preview(&mut state, &mut preview_job);
+        program_status::set(reader_status(
+            &ui.mode,
+            &state,
+            page_job.is_some() || preview_job.is_some() || !waiting.is_empty(),
+        ));
         if signal.load(Ordering::Relaxed) {
             break save_on_exit(&mut ui, &state);
         }
@@ -1587,7 +1598,24 @@ pub fn run(mut state: State, mut clients: Clients) -> Result<(), String> {
     };
     terminal_guard.disarm();
     leave(enhanced);
+    if result.is_ok() {
+        program_status::cancel();
+    }
     result
+}
+
+#[cfg(feature = "native")]
+fn reader_status(mode: &Mode, state: &State, busy: bool) -> Status {
+    match mode {
+        Mode::SignIn(_) => Status::Blocked(StatusKind::Auth),
+        Mode::Compose(composer) if matches!(composer.overlay, Overlay::Ask(_)) => {
+            Status::Blocked(StatusKind::Question)
+        }
+        _ if busy => Status::Working(Activity::Loading),
+        _ if state.status_error.is_some() => Status::Error,
+        _ if state.status_expiry.is_some() => Status::Done,
+        _ => Status::Idle,
+    }
 }
 
 // MARK: input batches
@@ -2052,6 +2080,13 @@ fn handle_key_busy(
         (&ui.mode, &press),
         (Mode::Compose(_), Press::Key(key)) if submits(*key, state.enter, ui.enhanced)
     );
+    let activity = if sending {
+        Activity::Posting
+    } else if matches!(ui.mode, Mode::SignIn(_)) {
+        Activity::SigningIn
+    } else {
+        Activity::Loading
+    };
     let word = if sending { "sending" } else { "loading" };
     let look = state.theme.clone();
     let detail = state.detail;
@@ -2100,6 +2135,7 @@ fn handle_key_busy(
             if TERMINAL_SUSPENDED.load(Ordering::SeqCst) || started.elapsed() < BUSY_AFTER {
                 continue;
             }
+            program_status::working(activity);
             while event::poll(Duration::ZERO).unwrap_or(false) {
                 let Ok(Event::Key(pressed)) = event::read() else {
                     continue;
@@ -2124,6 +2160,7 @@ fn handle_key_busy(
 /// Leaves the terminal as it was and exits with the status of an interrupted program.
 #[cfg(feature = "native")]
 fn quit_now(enhanced: bool) -> ! {
+    program_status::cancel();
     leave(enhanced);
     std::process::exit(130)
 }
@@ -2273,11 +2310,22 @@ fn compose_loop(
     };
     loop {
         watchdog::beat();
+        program_status::set(if matches!(composer.overlay, Overlay::Ask(_)) {
+            Status::Blocked(StatusKind::Question)
+        } else if state.status_error.is_some() {
+            Status::Error
+        } else {
+            Status::Idle
+        });
         if let Err(err) = composer.autosave(state, &drafts::path()) {
             state.fail(err);
         }
         if signal.load(Ordering::Relaxed) {
-            return interrupted(composer, state);
+            let result = interrupted(composer, state);
+            if result.is_ok() {
+                program_status::cancel();
+            }
+            return result;
         }
         terminal
             .draw(|frame| draw_compose(frame, state, composer, enhanced))
@@ -2305,11 +2353,21 @@ fn compose_loop(
         if disclosure(state, &mut disclosure_keys, key) {
             continue;
         }
+        program_status::acknowledge();
         match composer_key(state, composer, key, enhanced, &tab_targets) {
             Step::Stay => {}
-            Step::Closed { saved: true, .. } => return Ok(Composed::Saved),
-            Step::Closed { saved: false, .. } => return Ok(Composed::Discarded),
-            Step::Submit => return Ok(Composed::Sent(composer.intent())),
+            Step::Closed { saved, .. } => {
+                program_status::cancel();
+                return Ok(if saved {
+                    Composed::Saved
+                } else {
+                    Composed::Discarded
+                });
+            }
+            Step::Submit => {
+                program_status::set(Status::Working(Activity::Posting));
+                return Ok(Composed::Sent(composer.intent()));
+            }
         }
     }
 }

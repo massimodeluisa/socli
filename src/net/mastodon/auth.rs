@@ -142,6 +142,18 @@ fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 }
 
 pub fn login(server: Option<String>, token: Option<String>) -> Result<(), String> {
+    #[cfg(feature = "native")]
+    {
+        crate::program_status::task(Network::Mastodon, crate::program_status::TaskKind::Auth)
+            .finish(login_impl(server, token))
+    }
+    #[cfg(not(feature = "native"))]
+    {
+        login_impl(server, token)
+    }
+}
+
+fn login_impl(server: Option<String>, token: Option<String>) -> Result<(), String> {
     let server = match non_empty(server).or_else(|| env("MASTODON_SERVER")) {
         Some(given) => normalize_server(&given)?,
         None => ask_server()?,
@@ -182,7 +194,7 @@ pub fn login(server: Option<String>, token: Option<String>) -> Result<(), String
         Some("Authorization code:"),
     )?;
     let _ = util::open_browser(&url);
-    let code = util::prompt_line("", hint)?;
+    let code = util::prompt_auth("", hint)?;
     let code = code.trim();
     if code.is_empty() {
         return Err("no code was entered. run `socli login mastodon` again".into());

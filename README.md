@@ -230,6 +230,26 @@ Ids are scoped as `<network>:<native id>`, and a post link works in place of an 
 
 `socli help` lists every command. `socli help <command>` shows one command's flags and examples. `socli help --json` returns that table as JSON. Beyond the examples above, the help page covers `user`, `notifications`, `bookmarks`, `ask`, `repost`, `bookmark`, `share`, `follow`, `whoami`, `auth`, `config`, `drafts`, and the undo form of each toggle (`unlike`, `unrepost`, `unbookmark`, `unfollow`).
 
+## OSC 7501 program status
+
+The native CLI reports its activity through the [Program Status Protocol (OSC 7501)](https://www.superlogical.com/rex/docs/build/program-status). Terminals that support OSC 7501, including Rex, can show when SoCLI is working or waiting for input. Normal reports identify the program as `app=socli`, and the main report carries the title `SoCLI`. Commands and network requests report `working`; the reader and prompt report `idle` while waiting for the next instruction. Input waits report `blocked`, with `kind=auth` for sign-in, `kind=question` for a response, or `kind=permission` for confirmation. A finished command reports `done` or `error`, and cancellation reports `idle`.
+
+Provider operations also report child tasks with fixed network and operation labels. A Bluesky feed request uses `id=network/bluesky/read` and the title `Bluesky read`; publication, account actions and sign-in use `post`, `action` and `auth` in the same ID format. Password and browser-approval waits report `blocked` with `kind=auth` on the sign-in task. Children finish with `done` or `error`, and the next command or reader key clears completed children. Cancellation clears SoCLI's child tasks before the main report returns to `idle`.
+
+During a feed load, the main report includes `progress` from 0 to 100, measured from completed provider requests. A failed request counts as completed, so the percentage describes how much of the load has finished. Sign-in prompts, writes and work outside that load batch carry no percentage.
+
+Reports go to stderr. Automatic reporting requires stderr to be a terminal, agent mode to be off, and `TERM` to differ from `dumb`. Set `SOCLI_PROGRAM_STATUS` to choose another policy:
+
+| Value | Behavior |
+| --- | --- |
+| `auto` or unset | Use automatic terminal detection. |
+| `on` or `1` | Send reports even when stderr is redirected or agent mode is on. |
+| `off` or `0` | Disable reports. |
+
+JSON on stdout stays unchanged, including when reporting is forced. Titles and messages contain fixed activity descriptions; post text, search terms, account names, credentials and raw error details stay out of terminal status metadata. The reporter sends changes without a heartbeat or a feature probe and never reads input.
+
+Status reports travel one way to the terminal. Commands and keyboard input still use the existing CLI, and the browser reader does not emit these terminal reports.
+
 ## Detail levels
 
 The detail level is how much art the reader and `--print` draw. Set it with `--detail`, `SOCLI_DETAIL` or `ui.detail`. With none of those set, a normal terminal opens at rich. An ESP terminal, or a `TERM` of `dumb`, `unknown`, `ansi`, `vt52`, `vt100`, `vt102`, `vt220` or `network`, opens at plain. In the reader, `d` steps to the next level and `D` opens a picker. Either choice is written to `ui.detail` and used the next time you open SoCLI. `--detail` and `SOCLI_DETAIL` still win over the saved value. A narrow terminal changes the layout, and never the level.

@@ -2717,9 +2717,14 @@ impl State {
             reply_to,
             quote,
         };
-        let post = provider(clients, net)
-            .map_err(NetError::Other)?
-            .post(&draft)?;
+        #[cfg(feature = "native")]
+        let task = crate::program_status::task(net, crate::program_status::TaskKind::Post);
+        let posted = provider(clients, net)
+            .map_err(NetError::Other)
+            .and_then(|provider| provider.post(&draft));
+        #[cfg(feature = "native")]
+        let posted = task.finish(posted);
+        let post = posted?;
         let url = post.permalink();
         self.keep(post);
         if let Some(id) = self.current_feed_id() {
@@ -2742,7 +2747,13 @@ impl State {
             self.check(net, "repost undo", |caps| caps.unrepost)?;
         }
         if !self.demo {
-            provider(clients, net)?.set_repost(&id, on)?;
+            #[cfg(feature = "native")]
+            let task = crate::program_status::task(net, crate::program_status::TaskKind::Action);
+            let result = provider(clients, net)
+                .and_then(|provider| provider.set_repost(&id, on).map_err(String::from));
+            #[cfg(feature = "native")]
+            let result = task.finish(result);
+            result?;
         }
         if let Some(post) = self.posts.get_mut(&id) {
             set_counted_flag(&mut post.reposted, &mut post.metrics.reposts, on);
@@ -2774,11 +2785,18 @@ impl State {
         }
         let word = flag.word(net, on);
         if !self.demo {
-            let provider = provider(clients, net)?;
-            match flag {
-                Flag::Like => provider.set_like(&id, on)?,
-                Flag::Bookmark => provider.set_bookmark(&id, on)?,
-            }
+            #[cfg(feature = "native")]
+            let task = crate::program_status::task(net, crate::program_status::TaskKind::Action);
+            let result = provider(clients, net).and_then(|provider| {
+                match flag {
+                    Flag::Like => provider.set_like(&id, on),
+                    Flag::Bookmark => provider.set_bookmark(&id, on),
+                }
+                .map_err(String::from)
+            });
+            #[cfg(feature = "native")]
+            let result = task.finish(result);
+            result?;
         }
         if let Some(post) = self.posts.get_mut(&id) {
             match flag {
@@ -2809,7 +2827,13 @@ impl State {
             self.confirm(format!("demo · {verb} @{handle} here only"));
             return Ok(());
         }
-        provider(clients, net)?.set_follow(handle, on)?;
+        #[cfg(feature = "native")]
+        let task = crate::program_status::task(net, crate::program_status::TaskKind::Action);
+        let result = provider(clients, net)
+            .and_then(|provider| provider.set_follow(handle, on).map_err(String::from));
+        #[cfg(feature = "native")]
+        let result = task.finish(result);
+        result?;
         if on {
             self.following.insert(handle.to_string());
         } else {
@@ -2824,7 +2848,13 @@ impl State {
         let net = net_of(&id)?;
         self.check(net, "deletes", |caps| caps.delete)?;
         if !self.demo {
-            provider(clients, net)?.delete(&id)?;
+            #[cfg(feature = "native")]
+            let task = crate::program_status::task(net, crate::program_status::TaskKind::Action);
+            let result = provider(clients, net)
+                .and_then(|provider| provider.delete(&id).map_err(String::from));
+            #[cfg(feature = "native")]
+            let result = task.finish(result);
+            result?;
         }
         self.posts.remove(&id);
         for feed in self.feeds.values_mut() {
@@ -2919,6 +2949,8 @@ fn fan_out<T: Send>(
     nets: &[Network],
     job: impl Fn(&mut dyn Provider) -> Result<T, NetError> + Sync,
 ) -> Vec<(Network, Result<T, NetError>)> {
+    #[cfg(feature = "native")]
+    let progress = crate::program_status::batch(nets.len());
     let mut providers: Vec<&mut dyn Provider> = clients
         .providers_mut()
         .into_iter()
@@ -2929,9 +2961,25 @@ fn fan_out<T: Send>(
         .filter(|net| !providers.iter().any(|p| p.network() == **net))
         .map(|net| (*net, Err(NetError::SignInRequired(*net))))
         .collect();
+    #[cfg(feature = "native")]
+    for (net, result) in &out {
+        let task = crate::program_status::task(*net, crate::program_status::TaskKind::Read);
+        let _ = task.finish(result.as_ref());
+        progress.advance();
+    }
+    #[cfg(feature = "native")]
+    let perform = |provider: &mut dyn Provider| {
+        let task =
+            crate::program_status::task(provider.network(), crate::program_status::TaskKind::Read);
+        let result = task.finish(job(provider));
+        progress.advance();
+        result
+    };
+    #[cfg(not(feature = "native"))]
+    let perform = job;
     if providers.len() <= 1 {
         if let Some(p) = providers.pop() {
-            out.push((p.network(), job(p)));
+            out.push((p.network(), perform(p)));
         }
     } else {
         // The browser build has no threads. Several providers run one after another.
@@ -2939,18 +2987,19 @@ fn fan_out<T: Send>(
         {
             for p in providers {
                 let net = p.network();
-                out.push((net, job(p)));
+                out.push((net, perform(p)));
             }
         }
         #[cfg(feature = "native")]
         std::thread::scope(|scope| {
-            let job = &job;
+            let perform = &perform;
             let handles: Vec<_> = providers
                 .into_iter()
-                .map(|p| (p.network(), scope.spawn(move || job(p))))
+                .map(|p| (p.network(), scope.spawn(move || perform(p))))
                 .collect();
             for (net, handle) in handles {
                 let result = handle.join().unwrap_or_else(|_| {
+                    progress.advance();
                     Err(NetError::Other(format!(
                         "the {} request crashed",
                         net.label()
@@ -2961,6 +3010,8 @@ fn fan_out<T: Send>(
         });
     }
     out.sort_by_key(|(net, _)| *net);
+    #[cfg(feature = "native")]
+    progress.finish();
     out
 }
 
