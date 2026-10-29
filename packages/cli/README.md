@@ -1,6 +1,6 @@
 # soclish
 
-soclish installs the native SoCLI terminal client. The command is `socli`. One package contains the prebuilt executables for macOS Intel and Apple Silicon, and Linux ARMv7, ARM64, x86, and x64. The launcher selects the matching bundled executable, verifies its SHA-256, and forwards your arguments, terminal input, output, and exit status.
+soclish installs the native SoCLI terminal client. A global install puts `soclish` on your PATH. `socli` is the same program. One package contains the prebuilt executables for macOS Intel and Apple Silicon, and Linux ARMv7, ARM64, x86, and x64. The launcher selects the matching bundled executable, verifies its SHA-256, and forwards your arguments, terminal input, output, and exit status.
 
 Run it with Node.js 22 or newer:
 
@@ -15,7 +15,7 @@ To keep the command installed:
 
 ```sh
 npm install --global soclish
-socli --demo
+soclish --version
 ```
 
 The package includes all six executables and has no runtime npm dependencies. It installs without Rust or a postinstall script. Linux executables use musl and also run on glibc systems. ARM requires ARMv7 or newer and a matching Node.js build. Windows builds remain disabled.

@@ -4,6 +4,7 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Exposed `soclish` as a global npm command beside `socli`, and added the skills.sh badge.
 - Added native OSC 7501 status reports for supporting terminals, with activity, input waits, cancellation and an explicit stderr output policy.
 - Named the main terminal task SoCLI, added child tasks for each network operation and reported feed-load progress from completed provider requests. Cleared completed child tasks after input and all owned child tasks on cancellation without exposing request content or account details.
 

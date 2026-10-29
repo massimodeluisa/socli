@@ -14,7 +14,8 @@
     "node": ">=22"
   },
   "bin": {
-    "socli": "bin/socli.js"
+    "socli": "bin/socli.js",
+    "soclish": "bin/socli.js"
   },
   "files": [
     "bin",

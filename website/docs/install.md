@@ -29,10 +29,10 @@ Pass arguments after the package name, for example `npx soclish --demo` or `bunx
 
 ```sh
 npm install --global soclish
-socli --version
+soclish --version
 ```
 
-A global installation makes `socli` available directly, so the other documentation examples work without an `npx` or `bunx` prefix. Update it with `npm update --global soclish`.
+A global installation puts `soclish` on your PATH. `socli` is the same program, so the other examples work without an `npx` or `bunx` prefix. Update it with `npm update --global soclish`.
 
 ## Homebrew
 
