@@ -60,7 +60,7 @@ signal-hook = { version = "0.3", optional = true }
 ssh-key = { version = "0.6.7", default-features = false, features = ["std", "ed25519", "rand_core"] }
 textwrap = "0.16"
 thiserror = "2"
-toml = "0.8"
+toml = "1.1"
 unicode-segmentation = "1.13"
 unicode-width = "0.2"
 url = "2"
