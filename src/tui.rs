@@ -7161,7 +7161,7 @@ fn blit_kitty(
             };
             dst.set_symbol(&symbol);
             dst.set_fg(fg);
-            dst.set_skip(false);
+            dst.set_diff_option(src.diff_option);
         }
     }
 }

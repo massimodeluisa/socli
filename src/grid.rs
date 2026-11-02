@@ -7,8 +7,8 @@
 
 use std::io;
 
-use ratatui::backend::{Backend, WindowSize};
-use ratatui::buffer::{Buffer, Cell};
+use ratatui::backend::{Backend, ClearType, WindowSize};
+use ratatui::buffer::{Buffer, Cell, CellDiffOption};
 use ratatui::layout::{Position, Rect, Size};
 use ratatui::style::{Color, Modifier};
 use unicode_width::UnicodeWidthStr;
@@ -129,7 +129,7 @@ pub fn plain_text(buffer: &Buffer) -> String {
         for x in 0..width {
             let cell = &buffer[(x, y)];
             let span = cell.symbol().width();
-            if cover == 0 && !cell.skip {
+            if cover == 0 && !skipped(cell) {
                 line.push_str(cell.symbol());
             }
             cover = cover.max(span).saturating_sub(1);
@@ -145,8 +145,12 @@ pub fn plain_text(buffer: &Buffer) -> String {
     lines.join("\n")
 }
 
+fn skipped(cell: &Cell) -> bool {
+    matches!(cell.diff_option, CellDiffOption::Skip)
+}
+
 fn write_cell(out: &mut Vec<u8>, x: u16, y: u16, cell: &Cell, fg: [u8; 3], bg: [u8; 3]) {
-    let symbol = if cell.skip { "" } else { cell.symbol() };
+    let symbol = if skipped(cell) { "" } else { cell.symbol() };
     let mut scalars = symbol.chars();
     let first = scalars.next();
     let more = scalars.next().is_some();
@@ -263,6 +267,8 @@ fn ansi(index: u8) -> [u8; 3] {
 }
 
 impl Backend for Grid {
+    type Error = io::Error;
+
     fn draw<'a, I>(&mut self, content: I) -> io::Result<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
@@ -297,6 +303,33 @@ impl Backend for Grid {
         self.buffer = Buffer::empty(area);
         self.dirty.fill(false);
         self.full = true;
+        Ok(())
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> io::Result<()> {
+        let width = self.buffer.area.width;
+        let height = self.buffer.area.height;
+        if width == 0 || height == 0 {
+            return self.clear();
+        }
+        let x = self.cursor.x.min(width - 1);
+        let y = self.cursor.y.min(height - 1);
+        let cursor = self.buffer.index_of(x, y);
+        let last = self.buffer.content.len() - 1;
+        let (start, end) = match clear_type {
+            ClearType::All => return self.clear(),
+            ClearType::AfterCursor => (cursor, last),
+            ClearType::BeforeCursor => (0, cursor),
+            ClearType::CurrentLine => (
+                self.buffer.index_of(0, y),
+                self.buffer.index_of(width - 1, y),
+            ),
+            ClearType::UntilNewLine => (cursor, self.buffer.index_of(width - 1, y)),
+        };
+        for index in start..=end {
+            self.buffer.content[index].reset();
+            self.dirty[index] = true;
+        }
         Ok(())
     }
 

@@ -1,8 +1,9 @@
 //! OSC 8 hyperlinks: whether the terminal supports them, and the cells that open names and links.
 
 use std::io::IsTerminal;
+use std::num::NonZeroU16;
 
-use ratatui::buffer::Buffer;
+use ratatui::buffer::{Buffer, CellDiffOption};
 use ratatui::style::Style;
 use ratatui::text::Span;
 use url::Url;
@@ -128,9 +129,10 @@ fn cell_width(buf: &Buffer, x: u16, y: u16) -> usize {
 /**
 Wraps the chunk starting at `x` and returns the next x to visit.
 
-ratatui's diff measures a chunk by the printable characters of its escape sequence, so it never
-emits the cell right after the chunk's first cell. Every chunk therefore covers at least two
-display columns of one style, and a cell that cannot join one stays a plain cell.
+The escape sequence is not the width of the link. The chunk's forced width is the columns it
+covers, so the diff skips the cells inside the chunk and still emits the cell after it. Every
+chunk therefore covers at least two display columns of one style, and a cell that cannot join
+one stays a plain cell.
 */
 fn paint_chunk(buf: &mut Buffer, open: &str, x: u16, y: u16, end: u16) -> u16 {
     let style = buf[(x, y)].style();
@@ -157,9 +159,14 @@ fn paint_chunk(buf: &mut Buffer, open: &str, x: u16, y: u16, end: u16) -> u16 {
     }
     let symbols: String = members.iter().map(|&m| buf[(m, y)].symbol()).collect();
     for &member in &members[1..] {
-        buf[(member, y)].set_skip(true);
+        buf[(member, y)].set_diff_option(CellDiffOption::Skip);
     }
     buf[(x, y)].set_symbol(&format!("{open}{symbols}{CLOSE}"));
+    // The escape sequence is wider than the columns it occupies. Pin the diff to those columns
+    // so the cell after the chunk is still redrawn.
+    if let Some(columns) = NonZeroU16::new(after.saturating_sub(x)) {
+        buf[(x, y)].set_diff_option(CellDiffOption::ForcedWidth(columns));
+    }
     after
 }
 
@@ -174,8 +181,9 @@ fn same_style(buf: &Buffer, from: u16, y: u16, end: u16, style: Style) -> Option
 
 #[cfg(test)]
 mod tests {
+    use ratatui::buffer::CellDiffOption;
     use ratatui::layout::Rect;
-    use ratatui::style::{Color, Stylize};
+    use ratatui::style::Color;
 
     use super::*;
 
@@ -324,7 +332,9 @@ mod tests {
     }
 
     fn skipped(buf: &Buffer) -> Vec<u16> {
-        (0..buf.area.width).filter(|&x| buf[(x, 0)].skip).collect()
+        (0..buf.area.width)
+            .filter(|&x| buf[(x, 0)].diff_option == CellDiffOption::Skip)
+            .collect()
     }
 
     #[test]
@@ -395,7 +405,7 @@ mod tests {
         paint(&mut buf, &[region(0, 5)]);
         assert_eq!(buf[(0, 0)].symbol(), linked(URL, "ab"));
         assert_eq!(buf[(2, 0)].symbol(), "c");
-        assert!(!buf[(2, 0)].skip);
+        assert_ne!(buf[(2, 0)].diff_option, CellDiffOption::Skip);
         assert_eq!(buf[(3, 0)].symbol(), linked(URL, "de"));
         assert_eq!(skipped(&buf), [1, 4]);
     }
@@ -423,7 +433,7 @@ mod tests {
         let mut buf = Buffer::with_lines(["abcde"]);
         paint(&mut buf, &[region(3, 10)]);
         assert_eq!(buf[(3, 0)].symbol(), linked(URL, "de"));
-        assert!(buf[(4, 0)].skip);
+        assert_eq!(buf[(4, 0)].diff_option, CellDiffOption::Skip);
         assert_eq!(buf[(2, 0)].symbol(), "c");
     }
 
