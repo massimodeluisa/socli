@@ -4,6 +4,7 @@ Release notes are kept here. Move entries from `[Unreleased]` into a dated versi
 
 ## [Unreleased]
 
+- Updated `sha1` to 0.11 and `pbkdf2` to 0.13 so X browser-cookie key derivation uses one digest version.
 - Updated ratatui to 0.30 and ratatui-image to 10.0.1, and adapted the browser backend and hyperlink diff width to those APIs.
 - Exposed `soclish` as a global npm command beside `socli`, and added the skills.sh badge.
 - Added native OSC 7501 status reports for supporting terminals, with activity, input waits, cancellation and an explicit stderr output policy.
