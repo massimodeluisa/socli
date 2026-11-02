@@ -2,12 +2,12 @@
 
 use std::io::{self, Write};
 
-use ratatui::buffer::Buffer;
+use ratatui::buffer::{Buffer, CellDiffOption};
 use ratatui::layout::{Position, Rect};
 use ratatui::style::Color;
 
 /**
-Kitty places an image with one private-use character per cell. ratatui-image 9 packs a whole
+Kitty places an image with one private-use character per cell. ratatui-image packs a whole
 row, including the image transmit, into the first cell and skips the rest. That cell is wider
 than one column, so the next cell is left out of the frame diff and the picture tears while
 the feed scrolls. The table is the one kitty publishes for those row and column marks.
@@ -398,7 +398,7 @@ pub(crate) fn settle(buf: &mut Buffer, area: Rect) -> Option<String> {
             text.push(place.id);
             cell.set_symbol(&text);
             cell.set_fg(place.fg);
-            cell.set_skip(false);
+            cell.set_diff_option(CellDiffOption::None);
         }
     }
     Some(transmit)
@@ -416,6 +416,8 @@ pub(crate) fn emit(data: &str) {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::buffer::CellDiffOption;
+
     use super::*;
     use unicode_width::UnicodeWidthStr;
 
@@ -438,13 +440,13 @@ mod tests {
         for x in 1..5 {
             buf.cell_mut(Position::new(x, 0))
                 .expect("cell")
-                .set_skip(true);
+                .set_diff_option(CellDiffOption::Skip);
         }
         let transmit = settle(&mut buf, Rect::new(0, 0, 5, 1)).expect("kitty");
         assert_eq!(transmit, "TRANSMIT");
         for x in 0..5 {
             let cell = buf.cell(Position::new(x, 0)).expect("cell");
-            assert!(!cell.skip);
+            assert_eq!(cell.diff_option, CellDiffOption::None);
             assert_eq!(cell.symbol().width(), 1, "{x}");
             assert!(cell.symbol().starts_with(PLACEHOLDER));
             assert_eq!(cell.fg, Color::Rgb(1, 2, 3));

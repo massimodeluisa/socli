@@ -49,8 +49,10 @@ crossterm = { version = "0.29", optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 rand = { version = "0.8", optional = true }
-ratatui = { version = "0.29", default-features = false }
-ratatui-image = { version = "9.0.0", default-features = false, features = ["crossterm"], optional = true }
+ratatui = { version = "0.30", default-features = false, features = ["std"] }
+# 10.0.1 is the last ratatui 0.30 widget release that does not pull quantette 0.5+.
+# quantette 0.4 and later declare rust-version 1.90, above this crate's MSRV.
+ratatui-image = { version = "=10.0.1", default-features = false, optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"], optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
